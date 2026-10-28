@@ -240,6 +240,12 @@ textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding
 .legend3 i.sq { border-radius: 2px; }
 .legend3 i.ring { background: none !important; border: 2px solid var(--ink); width: 14px; height: 14px; }
 .legend3 i.ringc { background: none !important; border: 2px dashed var(--gap); width: 14px; height: 14px; }
+input.words { font-family: var(--mono); font-size: 14px; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 7px; background: var(--bg); color: var(--ink); width: 100%; }
+.skw { display: flex; flex-wrap: wrap; gap: 6px; font-family: var(--mono); font-size: 12.5px; }
+.skw span { padding: 3px 8px; border-radius: 99px; border: 1px solid transparent; background: var(--sunk); }
+.skw span.en { color: var(--c0); } .skw span.es { color: var(--c1); }
+.skw span.sv { border-color: currentColor; font-weight: 600; }
+.skw span sub { color: var(--muted); font-size: 10.5px; margin-left: 4px; }
 .hov { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 1.6em; margin: 6px 0 0; }
 </style>
 </head>
@@ -620,6 +626,7 @@ textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding
   <div class="intro">
     <p>In the dual, the data show up only as inner products \(\mathbf x_i^\top\mathbf x_j\): in the objective, in the prediction, and in the bias. Replace each one with a Mercer kernel \(K(\mathbf x_i,\mathbf x_j)\) and you are running a linear SVM in the kernel's feature space \(\boldsymbol\phi(\mathbf x)\) without ever computing \(\boldsymbol\phi\).</p>
     <p>The prediction becomes \(f(\mathbf x)=\sum_{n\in\mathcal S}\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)+\hat w_0\) (Eq. 17.93). The boundary is a straight hyperplane in feature space and a curve in input space. The cost of one prediction is one kernel evaluation per support vector.</p>
+    <p>This section has the most to play with: a kernel playground with Eq. 17.93 split into one bump per support vector, a lift from 1-D to 2-D, a count of how many features a kernel saves you from building, a grid of RBF settings, and an SVM that classifies <i>words</i> with a string kernel.</p>
   </div>
 
   <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
@@ -632,11 +639,13 @@ textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding
       <div data-l="2">
         <p>A curved boundary in 2-D can be a flat one in a higher-dimensional space. Take a point on a number line, \(x\), and turn it into two numbers \((x,x^2)\). Points far from 0 rise up a parabola and points near 0 stay low, so a slanted line in the new plane can separate "near 0" from "far from 0." The lift panel below does this.</p>
         <p>The SVM's formulas only ever multiply points together: \(\mathbf x_i\cdot\mathbf x_j\). In the lifted space that product is \(x_ix_j+x_i^2x_j^2\), which you can compute straight from \(x_i\) and \(x_j\). A <b>kernel</b> is any formula like that. The RBF kernel corresponds to infinitely many lifted coordinates, and it still costs one exponential to compute.</p>
+        <p>The answer the SVM gives is a sum: for a new point, add up "how similar is it to each support vector," with red support vectors counting plus and blue ones minus, then add a constant. The slice panel draws each piece of that sum. And because only similarities are needed, the "points" don't even have to be points. They can be words, as long as you can score how alike two words are.</p>
       </div>
       <div data-l="3">
         <p>Kernelize each place a dot product appears. Objective: \(\sum_n\alpha_n-\tfrac12\sum_{ij}\alpha_i\alpha_j\tilde y_i\tilde y_jK(\mathbf x_i,\mathbf x_j)\). Prediction (17.93): \(f(\mathbf x)=\sum_{n\in\mathcal S}\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)+\hat w_0\). Bias (17.94): average \(\tilde y_i-\sum_j\alpha_j\tilde y_jK(\mathbf x_j,\mathbf x_i)\) over support vectors.</p>
         <p>\(\hat{\mathbf w}=\sum\alpha_n\tilde y_n\boldsymbol\phi(\mathbf x_n)\) still exists in feature space, but you never form it. The dual stays a convex QP as long as \(K\) is PSD, because the matrix \(Q_{ij}=\tilde y_i\tilde y_jK_{ij}\) is then PSD.</p>
         <p>This is 17.63 again: \(\alpha_i\) there is \(\alpha_i\tilde y_i\) here, and it is zero for non-support vectors. Kernels also work on strings and graphs (§17.1.2.4), where there's no \(\mathbf x\) to take a dot product of.</p>
+        <p>Cost: a polynomial kernel of degree \(d\) in \(D\) dimensions has \(\binom{D+d}{d}\) features but costs \(O(D)\) to evaluate. Training in the dual touches only the \(N\times N\) Gram matrix, so the price of the kernel trick is paid in \(N\), not in the feature dimension.</p>
       </div>
       <div data-l="4">
         <ul>
@@ -669,14 +678,60 @@ textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding
         <div class="stat m"><div class="k">ŵ₀ (Eq. 17.94)</div><div class="v" id="kt-w0">–</div></div>
       </div>
       <div class="chain" id="kt-chain"></div>
+
+      <h4 style="font-family:var(--display);margin:22px 0 4px">Eq. 17.93 along one slice: f is a sum of bumps</h4>
+      <p class="hint">The dashed horizontal line on the plot above is a slice at a fixed \(x_2\). Below, each thin curve is one support vector's term \(\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)\) along that slice (red terms push up, blue terms push down), and the purple curve is their sum plus \(\hat w_0\). Where purple crosses zero, the slice crosses the decision boundary. Switch kernels to see the bumps change shape: Gaussian hills for RBF, straight lines for linear, polynomial curves for polynomial.</p>
+      <div class="ctrl"><label for="kt-ys">slice at x₂ =</label><input type="range" id="kt-ys" min="-2.9" max="2.9" step="0.05" value="0.5"><output id="kt-ys-o">0.50</output></div>
+      <svg class="plot" id="kt-slice" viewBox="0 0 640 250" aria-label="Decision function along a slice, split into one term per support vector"></svg>
+    </div>
+
+    <div class="panel">
+      <h4>Same data, twelve RBF SVMs: length scale against C</h4>
+      <p class="hint">Each tile is an RBF SVM trained on the playground's current points. Rows change \(\ell\), columns change \(C\). Small \(\ell\) with large \(C\) hugs individual points and uses many support vectors. Large \(\ell\) with small \(C\) gives smooth, nearly linear boundaries. Click a tile to load its settings into the playground.</p>
+      <svg class="plot" id="kg-svg" viewBox="0 0 640 440" aria-label="Grid of RBF SVM decision boundaries over length scale and C"></svg>
     </div>
 
     <div class="panel">
       <h4>Where the curve comes from: lift, cut flat, project back</h4>
       <p class="hint">Six blue points sit between two groups of red ones on a line. No single threshold separates them. Slide the lift to map each \(x\) to \((x,x^2)\). Up there a linear SVM finds a straight line, and its two crossings with the parabola are the two thresholds back on the line. Click two points to check that \(\boldsymbol\phi(a)^\top\boldsymbol\phi(b)=K(a,b)\).</p>
-      <div class="ctrl"><label for="lf-t">lift</label><input type="range" id="lf-t" min="0" max="1" step="0.01" value="0"><output id="lf-t-o">0%</output></div>
+      <div class="ctrl"><label for="lf-t">lift</label><input type="range" id="lf-t" min="0" max="1" step="0.01" value="0.6"><output id="lf-t-o">60%</output></div>
       <svg class="plot" id="lf-svg" viewBox="0 0 640 300" aria-label="One-dimensional points lifted onto a parabola"></svg>
       <div class="chain" id="lf-chain"></div>
+    </div>
+
+    <div class="panel">
+      <h4>Why not just compute the features? Count them</h4>
+      <p class="hint">The polynomial kernel \((\mathbf x^\top\mathbf x'+1)^d\) equals \(\boldsymbol\phi(\mathbf x)^\top\boldsymbol\phi(\mathbf x')\), where \(\boldsymbol\phi\) lists every monomial of degree \(\le d\) with a coefficient in front. Left: check it with numbers for \(D=2,d=2\). Right: how many features that is in general, and what each approach costs per inner product.</p>
+      <div class="two-even">
+        <div>
+          <div class="btns" style="margin-top:0"><button class="b" id="pf-new">New pair of points</button></div>
+          <div class="chain" id="pf-check"></div>
+        </div>
+        <div>
+          <div class="ctrl"><label for="pf-D">input dims D</label><input type="range" id="pf-D" min="0" max="4" step="0.05" value="2"><output id="pf-D-o">100</output></div>
+          <div class="ctrl"><label for="pf-d">degree d</label><input type="range" id="pf-d" min="1" max="10" step="1" value="3"><output id="pf-d-o">3</output></div>
+          <div class="readout">
+            <div class="stat r"><div class="k">explicit features C(D+d, d)</div><div class="v" id="pf-nf">–</div></div>
+            <div class="stat g"><div class="k">kernel: multiply-adds</div><div class="v" id="pf-nk">–</div></div>
+            <div class="stat a"><div class="k">kernel is cheaper by</div><div class="v" id="pf-x">–</div></div>
+          </div>
+          <p class="hint" style="margin-top:10px">The RBF kernel's feature space is infinite-dimensional, so the explicit route isn't even possible. The kernel still costs about \(D\) operations.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>Kernels on things that aren't vectors: classify words</h4>
+      <p class="hint">The book's point that kernels "allow us to easily apply classifiers to structured objects, such as strings." Each word becomes its counts of letter pairs (bigrams, with ^ and $ marking the start and end). The kernel is the normalized count of shared bigrams, \(K(a,b)=\boldsymbol\phi(a)^\top\boldsymbol\phi(b)/\lVert\boldsymbol\phi(a)\rVert\lVert\boldsymbol\phi(b)\rVert\) (§17.1.2.4). An SVM is trained on 18 English and 18 Spanish words. Type any word. The SVM never sees a vector of numbers, only \(K\).</p>
+      <div class="btns" style="margin-top:0"><input class="words" id="sk-in" type="text" value="weather" autocomplete="off" spellcheck="false" aria-label="Word to classify" style="max-width:260px"><span class="lab">try: </span><div class="seg" id="sk-try"><button>chocolate</button><button>shopping</button><button>montaña</button><button>whiskey</button><button>guitarra</button></div></div>
+      <div class="readout">
+        <div class="stat m"><div class="k">f(word)</div><div class="v" id="sk-f">–</div></div>
+        <div class="stat"><div class="k">prediction</div><div class="v" id="sk-p">–</div></div>
+        <div class="stat a"><div class="k">support vectors</div><div class="v" id="sk-nsv">–</div></div>
+      </div>
+      <div class="chain" id="sk-chain"></div>
+      <p class="cap" style="margin-top:12px">training words (support vectors are outlined, with their α)</p>
+      <div id="sk-words" class="skw"></div>
     </div>
 
     <div class="panel">
@@ -698,6 +753,30 @@ textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding
         <li><div>\(\hat{\mathbf w}=\sum_n\alpha_n\tilde y_n\boldsymbol\phi(\mathbf x_n)\) may be infinite-dimensional, but \(\hat{\mathbf w}^\top\boldsymbol\phi(\mathbf x)=\sum_n\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)\) is a finite sum. <span class="why">That's 17.93. Hover over the Play box to see it evaluated.</span></div></li>
       </ol>
 
+      <h4>Every place a dot product appears</h4>
+      <div class="scroll"><table class="vs">
+        <thead><tr><th></th><th>linear SVM (17.77–17.82)</th><th>kernel SVM (17.93–17.94)</th></tr></thead>
+        <tbody>
+          <tr><th>dual objective</th><td>\(\sum\alpha_n-\tfrac12\sum_{ij}\alpha_i\alpha_j\tilde y_i\tilde y_j\,\mathbf x_i^\top\mathbf x_j\)</td><td>\(\sum\alpha_n-\tfrac12\sum_{ij}\alpha_i\alpha_j\tilde y_i\tilde y_j\,K(\mathbf x_i,\mathbf x_j)\)</td></tr>
+          <tr><th>constraints</th><td>\(0\le\alpha_n\le C,\ \sum\alpha_n\tilde y_n=0\)</td><td>unchanged</td></tr>
+          <tr><th>prediction</th><td>\(\sum_{\mathcal S}\alpha_n\tilde y_n\,\mathbf x_n^\top\mathbf x+\hat w_0\)</td><td>\(\sum_{\mathcal S}\alpha_n\tilde y_n\,K(\mathbf x_n,\mathbf x)+\hat w_0\)</td></tr>
+          <tr><th>bias</th><td>\(\tilde y_i-\sum_j\alpha_j\tilde y_j\,\mathbf x_j^\top\mathbf x_i\), averaged</td><td>\(\tilde y_i-\sum_j\alpha_j\tilde y_j\,K(\mathbf x_j,\mathbf x_i)\), averaged</td></tr>
+          <tr><th>what you store</th><td>\(\hat{\mathbf w}\in\mathbb R^D\)</td><td>the support vectors and their \(\alpha_n\tilde y_n\)</td></tr>
+          <tr><th>boundary</th><td>a hyperplane in \(\mathbb R^D\)</td><td>a hyperplane in feature space, a curve in input space</td></tr>
+        </tbody>
+      </table></div>
+      <p>The solver (SMO in this page) is literally the same code for both: it only ever reads the Gram matrix \(K_{ij}\). The Play boxes in 17.3.2, 17.3.3 and here all call one function, with a different \(K\).</p>
+
+      <h4>Why the dual stays convex: PSD kernel ⇒ PSD \(Q\)</h4>
+      <p>Write \(Q_{ij}=\tilde y_i\tilde y_jK(\mathbf x_i,\mathbf x_j)\). For any \(\boldsymbol\alpha\), using \(K=\boldsymbol\phi^\top\boldsymbol\phi\):</p>
+      <div class="eq">\[ \boldsymbol\alpha^\top Q\boldsymbol\alpha=\sum_{ij}\alpha_i\tilde y_i\,\boldsymbol\phi(\mathbf x_i)^\top\boldsymbol\phi(\mathbf x_j)\,\alpha_j\tilde y_j=\Big\lVert\sum_n\alpha_n\tilde y_n\boldsymbol\phi(\mathbf x_n)\Big\rVert^2=\lVert\hat{\mathbf w}\rVert^2\ \ge\ 0. \]</div>
+      <p>So \(-\tfrac12\boldsymbol\alpha^\top Q\boldsymbol\alpha\) is concave and the dual has no bad local optima. Even without writing \(\boldsymbol\phi\) down, Mercer's condition (17.1) gives the same thing: \(\boldsymbol\alpha^\top Q\boldsymbol\alpha=\mathbf c^\top\mathbf K\mathbf c\ge0\) with \(c_n=\alpha_n\tilde y_n\).</p>
+
+      <h4>The polynomial kernel, expanded</h4>
+      <p>For \(D=2\), \(d=2\), multiply out \((x_1x_1'+x_2x_2'+1)^2\):</p>
+      <div class="eq">\[ 1+2x_1x_1'+2x_2x_2'+x_1^2x_1'^2+x_2^2x_2'^2+2x_1x_2x_1'x_2'=\boldsymbol\phi(\mathbf x)^\top\boldsymbol\phi(\mathbf x'),\quad \boldsymbol\phi(\mathbf x)=\big(1,\sqrt2x_1,\sqrt2x_2,x_1^2,x_2^2,\sqrt2x_1x_2\big). \]</div>
+      <p>In general there are \(\binom{D+d}{d}\) monomials. For \(D=100\), \(d=3\) that's 176,851 features, versus about \(D+d=103\) operations for the kernel: one dot product, one add, and a cube.</p>
+
       <h4>Kernelize the bias</h4>
       <div class="eq">\[ \hat w_0=\frac1{|\mathcal S|}\sum_{i\in\mathcal S}\Big(\tilde y_i-\Big(\sum_{j\in\mathcal S}\hat\alpha_j\tilde y_j\mathbf x_j\Big)^\top\mathbf x_i\Big)=\frac1{|\mathcal S|}\sum_{i\in\mathcal S}\Big(\tilde y_i-\sum_{j\in\mathcal S}\hat\alpha_j\tilde y_jK(\mathbf x_j,\mathbf x_i)\Big) \tag{17.94} \]</div>
       <p>For a soft margin, average over the on-margin set \(\mathcal M\) instead of \(\mathcal S\), as in 17.88. That's what the Play box does.</p>
@@ -708,7 +787,12 @@ textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding
       <p>A line in the \((x,x^2)\) plane is a quadratic in \(x\), and its two roots are the two thresholds. For example \(a=2,b=3\): \(\boldsymbol\phi(a)^\top\boldsymbol\phi(b)=(2,4)\cdot(3,9)=6+36=42=2\cdot3+4\cdot9\).</p>
 
       <h4>Why the RBF can carve out any shape</h4>
-      <p>With \(K(\mathbf x,\mathbf x')=\exp(-\lVert\mathbf x-\mathbf x'\rVert^2/2\ell^2)\), \(f\) is a sum of Gaussian bumps centered on the support vectors, positive bumps for red and negative for blue, plus \(\hat w_0\). Small \(\ell\) means narrow bumps and a boundary that hugs individual points. Far from all support vectors, \(f(\mathbf x)\to\hat w_0\).</p>
+      <p>With \(K(\mathbf x,\mathbf x')=\exp(-\lVert\mathbf x-\mathbf x'\rVert^2/2\ell^2)\), \(f\) is a sum of Gaussian bumps centered on the support vectors, positive bumps for red and negative for blue, plus \(\hat w_0\). Small \(\ell\) means narrow bumps and a boundary that hugs individual points. Far from all support vectors, \(f(\mathbf x)\to\hat w_0\). The slice panel draws exactly these bumps.</p>
+
+      <h4>Strings: no vectors, just a kernel</h4>
+      <p>For words, \(\boldsymbol\phi_s(a)\) counts how often bigram \(s\) occurs in \(a\), and</p>
+      <div class="eq">\[ K(a,b)=\frac{\sum_s\phi_s(a)\phi_s(b)}{\sqrt{\sum_s\phi_s(a)^2}\sqrt{\sum_s\phi_s(b)^2}}. \]</div>
+      <p>Example: "night" has bigrams {^n, ni, ig, gh, ht, t$} and "light" has {^l, li, ig, gh, ht, t$}. They share 4 of 6, so \(K=4/\sqrt{6\cdot6}=0.667\). The SVM dual, SMO and 17.93 run unchanged. The "support vectors" are now words.</p>
     </div>
   </div>
 
@@ -1245,7 +1329,7 @@ const rnd2 = v => Math.round(v * 100) / 100;
    ===================================================================== */
 (function () {
   const svg = $('#kt-svg');
-  const st = { P: [], Y: [], d: 'circles', k: 'rbf', l: .8, deg: 2, logC: 1, seed: 3, cls: 1 };
+  const st = { P: [], Y: [], d: 'circles', k: 'rbf', l: .8, deg: 2, logC: 1, seed: 3, cls: 1, ys: .5 };
   let f = planeFrame(), M = null;
   const KF = {
     lin: dot2,
@@ -1261,9 +1345,10 @@ const rnd2 = v => Math.round(v * 100) / 100;
     else for (let i = 0; i < 40; i++) { const c = i % 2 ? 1 : -1; add(c * 1.3 + gauss(r) * .8, c * .6 + gauss(r) * .8, c); }
   }
   // marching squares: segments of {f = c} from grid values V[j][i] at (gx[i], gy[j])
-  function contour(V, gx, gy, c) {
+  function contour(V, gx, gy, c, fr) {
     let d = '';
-    const P = (i, j) => [f.X(gx[i]), f.Y(gy[j])];
+    fr = fr || f;
+    const P = (i, j) => [fr.X(gx[i]), fr.Y(gy[j])];
     const it = (p, q, a, b) => { const t = (c - a) / (b - a); return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]; };
     for (let j = 0; j < gy.length - 1; j++) for (let i = 0; i < gx.length - 1; i++) {
       const a = V[j][i], b = V[j][i + 1], cc = V[j + 1][i + 1], e = V[j + 1][i];
@@ -1287,6 +1372,7 @@ const rnd2 = v => Math.round(v * 100) / 100;
       el('path', { d: contour(V, gx, gy, 1) + contour(V, gx, gy, -1), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, svg);
       el('path', { d: contour(V, gx, gy, 0), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.6 }, svg);
     } else planeAxes(svg, f);
+    el('line', { x1: f.L, x2: f.R, y1: f.Y(st.ys), y2: f.Y(st.ys), stroke: 'var(--mi)', 'stroke-width': 1.6, 'stroke-dasharray': '3 4' }, svg);
     st.P.forEach((p, i) => {
       pt(svg, f.X(p[0]), f.Y(p[1]), st.Y[i], 5.5);
       if (M && M.a[i] > 0) ring(svg, f.X(p[0]), f.Y(p[1]), M.a[i] < M.C ? 'free' : 'bound');
@@ -1298,6 +1384,59 @@ const rnd2 = v => Math.round(v * 100) / 100;
     $('#kt-w0').textContent = M ? f3(M.w0) : '–';
     const kd = st.k === 'lin' ? 'K(x, x′) = xᵀx′ (a straight boundary)' : st.k === 'poly' ? `K(x, x′) = (xᵀx′/4 + 1)^${st.deg}` : `K(x, x′) = exp(−‖x − x′‖² / 2·${f2(st.l)}²)`;
     $('#kt-chain').innerHTML = M ? `${kd}<br>support vectors: ${M.sv.length} of ${N} (on margin ${M.free.length}, at α = C ${M.sv.length - M.free.length}). <span class="mu">One prediction costs ${M.sv.length} kernel evaluations.</span>` : 'Need at least one point of each class.';
+    slice();
+    if (!fast) { clearTimeout(gridT); gridT = setTimeout(drawGrid, 250); }
+  }
+  // Eq. 17.93 along y = ys: one term αₙỹₙK(xₙ, x) per support vector, and their sum
+  function slice() {
+    const ss = $('#kt-slice'); ss.innerHTML = '';
+    if (!M) return;
+    const xs = grid(PX[0], PX[1], 241), at = x => [x, st.ys];
+    const terms = M.sv.map(n => ({ n, v: xs.map(x => M.a[n] * M.y[n] * M.k(M.X[n], at(x))) }));
+    const fv = xs.map(x => M.f(at(x)));
+    const shown = terms.filter(t => Math.max(...t.v.map(Math.abs)) > .03);
+    const top = Math.max(1.5, ...fv.map(Math.abs), ...shown.map(t => Math.max(...t.v.map(Math.abs)))) * 1.08;
+    const fs = frame({ W: 640, H: 250, l: 44, r: 12, t: 10, b: 32, x: PX, y: [-top, top] });
+    axes(ss, fs, { xt: [-4, -3, -2, -1, 0, 1, 2, 3, 4], yt: ticksAB(-top, top, 4), xl: 'x₁ (along the slice)' });
+    const g = clip(ss, fs, 'kt-slice-clip');
+    el('line', { x1: fs.L, x2: fs.R, y1: fs.Y(0), y2: fs.Y(0), stroke: 'var(--muted)' }, g);
+    for (const c of [-1, 1]) el('line', { x1: fs.L, x2: fs.R, y1: fs.Y(c), y2: fs.Y(c), stroke: 'var(--muted)', 'stroke-dasharray': '6 4', opacity: .6 }, g);
+    el('line', { x1: fs.L, x2: fs.R, y1: fs.Y(M.w0), y2: fs.Y(M.w0), stroke: 'var(--mi)', 'stroke-dasharray': '2 4', 'stroke-width': 1.4 }, g);
+    shown.forEach(t => el('path', { d: pathOf(xs.map((x, i) => [fs.X(x), fs.Y(t.v[i])])), fill: 'none', stroke: M.y[t.n] > 0 ? 'var(--c0)' : 'var(--c1)', 'stroke-width': 1.2, opacity: .7 }, g));
+    el('path', { d: pathOf(xs.map((x, i) => [fs.X(x), fs.Y(fv[i])])), fill: 'none', stroke: 'var(--mi)', 'stroke-width': 3 }, g);
+    for (let i = 1; i < xs.length; i++) if ((fv[i - 1] < 0) !== (fv[i] < 0)) { const x = xs[i - 1] + (xs[i] - xs[i - 1]) * fv[i - 1] / (fv[i - 1] - fv[i]); el('circle', { cx: fs.X(x), cy: fs.Y(0), r: 5, fill: 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 2 }, g); }
+    txt(ss, fs.R - 6, fs.T + 14, `f = Σ terms + ŵ₀   (${shown.length} of ${M.sv.length} SV terms visible here)`, 'lbl', { fill: 'var(--mi)', 'text-anchor': 'end' });
+    txt(ss, fs.L + 6, fs.Y(M.w0) - 5, 'ŵ₀', 'ax', { fill: 'var(--mi)' });
+  }
+  // 3 × 4 grid of RBF SVMs over (ℓ, C) on the current points
+  const GL = [.3, .8, 2], GC = [-1, 0, 1, 2];
+  let gridT = 0;
+  function drawGrid() {
+    const gs = $('#kg-svg'); gs.innerHTML = '';
+    if (st.P.length < 2 || new Set(st.Y).size < 2) return;
+    const tw = 136, th = 102, x0 = 60, y0 = 26, gap = 10;
+    GC.forEach((lc, c) => txt(gs, x0 + c * (tw + gap) + tw / 2, 16, `C = ${fmtT(10 ** lc)}`, 'axl', { 'text-anchor': 'middle' }));
+    GL.forEach((l, r) => {
+      const yt = y0 + r * (th + 38);
+      txt(gs, 8, yt + th / 2 + 4, `ℓ = ${l}`, 'axl');
+      GC.forEach((lc, c) => {
+        const xt = x0 + c * (tw + gap);
+        const k = (a, b) => Math.exp(-((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) / (2 * l * l));
+        const m = svmFit(st.P, st.Y, k, 10 ** lc, { maxIt: 20000 });
+        const fr = frame({ W: 640, H: 440, l: xt, r: 640 - xt - tw, t: yt, b: 440 - yt - th, x: PX, y: PY });
+        const gw = 48, gh = 36, gx = grid(PX[0], PX[1], gw), gy = grid(PY[0], PY[1], gh);
+        const V = gy.map(yy => gx.map(xx => m.f([xx, yy])));
+        raster(gs, fr, gw, gh, (i, j) => { const cc = divColor(Math.tanh(V[j][i] / 1.5) * .75); return [cc[0], cc[1], cc[2], 1]; });
+        el('path', { d: contour(V, gx, gy, 0, fr), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.6 }, gs);
+        st.P.forEach((p, i) => el('circle', { cx: fr.X(p[0]), cy: fr.Y(p[1]), r: m.a[i] > 0 ? 2.6 : 1.6, fill: st.Y[i] > 0 ? 'var(--c0)' : 'var(--c1)', stroke: m.a[i] > 0 ? 'var(--ink)' : 'none', 'stroke-width': .8 }, gs));
+        const on = st.k === 'rbf' && Math.abs(st.l - l) < .01 && Math.abs(st.logC - lc) < .01;
+        const box = el('rect', { x: xt, y: yt, width: tw, height: th, fill: 'transparent', stroke: on ? 'var(--mi)' : 'var(--rule)', 'stroke-width': on ? 3 : 1, rx: 3 }, gs);
+        box.style.cursor = 'pointer';
+        box.addEventListener('click', () => { st.k = 'rbf'; segSet('kt-k', 'k', 'rbf'); st.l = l; lS.set(l); st.logC = lc; cS.set(lc); render(); });
+        const acc = 100 * m.fs.filter((v, i) => st.Y[i] * v > 0).length / st.P.length;
+        txt(gs, xt + tw / 2, yt + th + 14, `${m.sv.length} SVs · ${acc.toFixed(0)}% train`, 'ax', { 'text-anchor': 'middle' });
+      });
+    });
   }
   function hover(p) {
     if (!M) return;
@@ -1318,12 +1457,13 @@ const rnd2 = v => Math.round(v * 100) / 100;
   segm('kt-d', b => { st.d = b.dataset.d; makeData(); render(); });
   segm('kt-cls', b => { st.cls = +b.dataset.c; });
   segm('kt-k', b => { st.k = b.dataset.k; render(); });
-  slider('kt-l', v => v.toFixed(2), v => { st.l = v; if (st.k === 'rbf') render(); });
+  const lS = slider('kt-l', v => v.toFixed(2), v => { st.l = v; if (st.k === 'rbf') render(); });
   slider('kt-deg', v => String(v), v => { st.deg = v; if (st.k === 'poly') render(); });
-  slider('kt-c', v => { const c = 10 ** v; return c < 10 ? c.toFixed(2) : c.toFixed(0); }, v => { st.logC = v; render(); });
+  const cS = slider('kt-c', v => { const c = 10 ** v; return c < 10 ? c.toFixed(2) : c.toFixed(0); }, v => { st.logC = v; render(); });
+  slider('kt-ys', v => f2(v), v => { st.ys = v; render(true); });
   $('#kt-new').addEventListener('click', () => { st.seed++; makeData(); render(); });
   $('#kt-clear').addEventListener('click', () => { st.P = []; st.Y = []; render(); });
-  makeData(); render(); renderers.push(() => render(true));
+  makeData(); render(); renderers.push(() => { render(true); drawGrid(); });
 })();
 
 /* ---------- Lift 1-D points onto a parabola ---------- */
@@ -1332,7 +1472,7 @@ const rnd2 = v => Math.round(v * 100) / 100;
   const XS = [-2.4, -1.9, -1.5, 1.4, 1.8, 2.3, -0.9, -0.5, -0.1, 0.3, 0.7, 1.0], YS = XS.map((_, i) => i < 6 ? 1 : -1);
   const PH = XS.map(x => [x, x * x]);
   const M = svmFit(PH, YS, KL.lin, 1e6), w = wOf(M);
-  const st = { t: 0, pick: [3, 9] };
+  const st = { t: .6, pick: [3, 9] };
   slider('lf-t', v => Math.round(v * 100) + '%', v => { st.t = v; render(); });
   let f;
   function render() {
@@ -1369,6 +1509,60 @@ const rnd2 = v => Math.round(v * 100) / 100;
   render(); renderers.push(render);
 })();
 
+/* ---------- Explicit polynomial features vs the kernel ---------- */
+(function () {
+  let seed = 11;
+  const phi = x => [1, Math.SQRT2 * x[0], Math.SQRT2 * x[1], x[0] * x[0], x[1] * x[1], Math.SQRT2 * x[0] * x[1]];
+  const NAMES = ['1', '√2x₁', '√2x₂', 'x₁²', 'x₂²', '√2x₁x₂'];
+  function check() {
+    const r = rng(seed), a = [rnd2(4 * r() - 2), rnd2(4 * r() - 2)], b = [rnd2(4 * r() - 2), rnd2(4 * r() - 2)];
+    const pa = phi(a), pb = phi(b), prod = pa.map((v, i) => v * pb[i]), dp = prod.reduce((s, v) => s + v, 0), k = (dot2(a, b) + 1) ** 2;
+    $('#pf-check').innerHTML = `x = (${f2(a[0])}, ${f2(a[1])}), x′ = (${f2(b[0])}, ${f2(b[1])})<br>` +
+      `ϕ = (${NAMES.join(', ')})<br>ϕ(x) = (${pa.map(f2).join(', ')})<br>ϕ(x′) = (${pb.map(f2).join(', ')})<br>` +
+      `ϕ(x)ᵀϕ(x′) = ${prod.map(f2).join(' + ')} = <span class="m">${f3(dp)}</span> <span class="mu">(6 features built, 6 multiplies)</span><br>` +
+      `(xᵀx′ + 1)² = (${f3(dot2(a, b))} + 1)² = <span class="ok">${f3(k)}</span> <span class="mu">(2 multiplies, 1 add, 1 square)</span>`;
+  }
+  let D = 100, d = 3;
+  function count() {
+    let nf = 1; for (let i = 1; i <= d; i++) nf = nf * (D + i) / i;
+    const nk = D + d;
+    $('#pf-nf').textContent = fmtBig(nf); $('#pf-nk').textContent = fmtBig(nk); $('#pf-x').textContent = '×' + fmtBig(nf / nk);
+  }
+  slider('pf-D', v => fmtBig(Math.round(10 ** v)), v => { D = Math.round(10 ** v); count(); });
+  slider('pf-d', v => String(v), v => { d = v; count(); });
+  $('#pf-new').addEventListener('click', () => { seed++; check(); });
+  check(); count();
+})();
+
+/* ---------- A string-kernel SVM on words ---------- */
+(function () {
+  const EN = ['thought', 'through', 'night', 'which', 'kitchen', 'weight', 'bright', 'laughing', 'knowledge', 'shine', 'whistle', 'father', 'rather', 'thing', 'wish', 'thanks', 'teacher', 'sharp'];
+  const ES = ['casa', 'perro', 'gato', 'mujer', 'ciudad', 'noche', 'rojo', 'hablar', 'queso', 'bonita', 'ventana', 'cerveza', 'amigo', 'llamar', 'pequeño', 'calle', 'zapato', 'manzana'];
+  const W = EN.concat(ES), Y = EN.map(() => 1).concat(ES.map(() => -1));
+  const grams = w => { const s = '^' + w.toLowerCase() + '$', c = {}; for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); c[g] = (c[g] || 0) + 1; } return c; };
+  const norm = c => Math.sqrt(Object.values(c).reduce((s, v) => s + v * v, 0));
+  const K = (a, b) => { const ga = grams(a), gb = grams(b); let s = 0; for (const g in ga) if (gb[g]) s += ga[g] * gb[g]; return s / (norm(ga) * norm(gb) || 1); };
+  const M = svmFit(W, Y, K, 10);
+  $('#sk-nsv').textContent = M.sv.length + ' / ' + W.length;
+  $('#sk-words').innerHTML = W.map((w, n) => `<span class="${Y[n] > 0 ? 'en' : 'es'}${M.a[n] > 0 ? ' sv' : ''}">${w}${M.a[n] > 0 ? `<sub>α=${f2(M.a[n])}</sub>` : ''}</span>`).join('');
+  function run() {
+    const w = $('#sk-in').value.trim().replace(/[^\p{L}]/gu, '');
+    if (!w) { $('#sk-f').textContent = '–'; $('#sk-p').textContent = '–'; $('#sk-chain').innerHTML = 'Type a word.'; return; }
+    const fx = M.f(w), gw = grams(w);
+    $('#sk-f').textContent = f3(fx);
+    $('#sk-p').textContent = fx >= 0 ? 'English' : 'Spanish'; $('#sk-p').style.color = fx >= 0 ? 'var(--c0)' : 'var(--c1)';
+    const terms = M.sv.map(n => ({ n, k: K(W[n], w), v: M.a[n] * Y[n] * K(W[n], w) })).filter(t => t.k > 0).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    const shared = n => { const gn = grams(W[n]); return Object.keys(gw).filter(g => gn[g]).join(' '); };
+    $('#sk-chain').innerHTML = `bigrams of "${w}": ${Object.keys(gw).join(' ')}<br>` +
+      (terms.length ? terms.slice(0, 5).map(t => `<span class="${Y[t.n] > 0 ? 'bad' : 'm'}">${W[t.n]}</span>: α ${f2(M.a[t.n])} · ${Y[t.n] > 0 ? '(+1)' : '(−1)'} · K = ${f3(t.k)} → ${t.v >= 0 ? '+' : ''}${f3(t.v)} <span class="mu">shares ${shared(t.n)}</span>`).join('<br>') +
+        (terms.length > 5 ? `<br><span class="mu">+ ${terms.length - 5} smaller terms</span>` : '') : 'No bigrams shared with any support vector: f = ŵ₀.') +
+      `<br>f = Σ terms + ŵ₀ (${f3(M.w0)}) = <b style="color:${fx >= 0 ? 'var(--c0)' : 'var(--c1)'}">${f3(fx)}</b>`;
+  }
+  $('#sk-in').addEventListener('input', run);
+  $('#sk-try').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { $('#sk-in').value = b.textContent; run(); } });
+  run();
+})();
+
 /* ---------- SVM score vs true log-odds (Fig. 17.15) ---------- */
 (function () {
   const svg = $('#lo-svg');
@@ -1392,6 +1586,7 @@ const rnd2 = v => Math.round(v * 100) / 100;
     el('path', { d: pathOf(xs.map(x => [f.X(x), f.Y(clamp(lnN(x, P1) - lnN(x, P0), -7, 7))])), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2, 'stroke-dasharray': '7 5' }, g);
     el('path', { d: pathOf(xs.map(x => [f.X(x), f.Y(clamp(M.f([x]), -7, 7))])), fill: 'none', stroke: 'var(--mi)', 'stroke-width': 2.6 }, g);
     X.forEach((x, i) => {
+      if (x[0] < .35 || x[0] > 1.25) return;
       const yy = Y[i] > 0 ? f.B - 10 : f.B - 22;
       pt(svg, f.X(x[0]), yy, Y[i], 4);
       if (M.a[i] > 0) el('circle', { cx: f.X(x[0]), cy: yy, r: 7.5, fill: 'none', stroke: M.a[i] < M.C ? 'var(--ink)' : 'var(--gap)', 'stroke-width': 1.2 }, svg);
@@ -1440,6 +1635,10 @@ const QUIZ = {
     { l: 'Undergrad', q: 'Why must K be a Mercer (PSD) kernel for the SVM dual?', o: ['So Qᵢⱼ = ỹᵢỹⱼKᵢⱼ is PSD and the dual stays concave', 'So the SVs are sparse', 'So w₀ is zero', 'So the data are separable'], a: 0, w: 'A PSD Gram matrix keeps the QP convex, with a global optimum that SMO finds.' },
     { l: 'Undergrad', q: 'RBF kernel, you shrink the length scale ℓ a lot. Typically…', o: ['Nearly every point becomes a support vector and the boundary hugs points', 'The boundary becomes a straight line', 'There are fewer support vectors', 'Nothing changes'], a: 0, w: 'Each kernel bump is narrow, so every point needs its own bump. Try it in the Play box.' },
     { l: 'Undergrad', q: 'Far from every support vector, an RBF SVM\'s f(x) approaches…', o: ['ŵ₀', '0', '+1', '−1'], a: 0, w: 'All K(xₙ, x) → 0, leaving only the bias.' },
+    { l: 'Undergrad', q: 'Polynomial kernel (xᵀx′ + 1)² on 2-D inputs. How many explicit features does it correspond to?', o: ['6', '4', '3', '9'], a: 0, w: '1, √2x₁, √2x₂, x₁², x₂², √2x₁x₂: C(2 + 2, 2) = 6.' },
+    { l: 'Undergrad', q: 'Which parts of the SVM change when you switch from xᵀx′ to K(x, x′)?', o: ['The Gram matrix in the dual, the prediction and the bias; the constraints stay the same', 'Only the constraints', 'Only the prediction', 'Everything, including the solver'], a: 0, w: 'Every dot product becomes K. The box and Σαỹ = 0 constraints and the solver itself are untouched.' },
+    { l: 'HS', q: 'Along a slice, an RBF SVM\'s f(x) is…', o: ['a sum of Gaussian bumps, one per support vector, plus a constant', 'a straight line', 'a single Gaussian', 'a step function'], a: 0, w: 'Each term αₙỹₙK(xₙ, x) is a bump centered at xₙ, up for red and down for blue (Eq. 17.93).' },
+    { l: 'Undergrad', q: '"night" and "light" share 4 of their 6 bigrams each. Their normalized bigram kernel value is…', o: ['4/6 ≈ 0.67', '4', '1', '4/12 ≈ 0.33'], a: 0, w: 'Shared count 4 divided by √(6·6) = 6.' },
     { l: 'Grad', q: 'Is the SVM score f(x) a calibrated log-odds?', o: ['No: use Platt scaling or a probabilistic model', 'Yes, by construction', 'Only with the RBF kernel', 'Only when C = 1'], a: 0, w: 'The hinge loss doesn\'t estimate probabilities (Fig. 17.15). Platt fits σ(af + b) on held-out data.' }
   ]
 };
