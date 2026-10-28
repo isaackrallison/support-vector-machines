@@ -1,0 +1,1510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Vector Machine Lab</title>
+<meta name="description" content="Interactive study guide for §17.3–17.3.4 of Murphy's Probabilistic Machine Learning: large margin classifiers, the geometry of the margin, feature scaling, the SVM dual and KKT conditions, support vectors, SMO, soft margins with slack and the C and ν parameters, and the kernel trick. Explanations at four levels, from elementary school to grad-level ML.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>
+window.MathJax = {
+  loader: { load: ['[tex]/html'] },
+  tex: { packages: { '[+]': ['html'] }, inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+  svg: { fontCache: 'global' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" async></script>
+<style>
+/* Layout: sticky chapter rail + one reading column; every section runs Explain it → Play → Math, slowly → Check yourself */
+:root {
+  --bg: #f3f1ec; --surface: #ffffff; --sunk: #e9e5dc; --ink: #1d1b18; --muted: #5f5a52; --rule: #d9d3c6;
+  --c0: #c0392b; --c1: #1f5fa8; --c2: #1d7a49; --c3: #a35d00; --c4: #6a3fc1; --c5: #0f7f86; --c6: #b0377f; --c7: #6b6b2a;
+  --gap: #a35d00; --mi: #6a3fc1; --green: #1d7a49; --red: #c0392b;
+  --c0-soft: rgba(192,57,43,.13); --c1-soft: rgba(31,95,168,.14); --c2-soft: rgba(29,122,73,.14); --gap-soft: rgba(163,93,0,.16); --mi-soft: rgba(106,63,193,.14); --green-soft: rgba(29,122,73,.14); --red-soft: rgba(192,57,43,.13);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12110f; --surface: #1b1a17; --sunk: #25231f; --ink: #ece7de; --muted: #a59e92; --rule: #35322c;
+    --c0: #f0776a; --c1: #6ea8ec; --c2: #52c48a; --c3: #e2a34b; --c4: #b393f2; --c5: #4cc4cc; --c6: #ea7fbf; --c7: #c2c26a;
+    --gap: #e2a34b; --mi: #b393f2; --green: #52c48a; --red: #f0776a;
+    --c0-soft: rgba(240,119,106,.18); --c1-soft: rgba(110,168,236,.18); --c2-soft: rgba(82,196,138,.16); --gap-soft: rgba(226,163,75,.2); --mi-soft: rgba(179,147,242,.2); --green-soft: rgba(82,196,138,.16); --red-soft: rgba(240,119,106,.18);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12110f; --surface: #1b1a17; --sunk: #25231f; --ink: #ece7de; --muted: #a59e92; --rule: #35322c;
+  --c0: #f0776a; --c1: #6ea8ec; --c2: #52c48a; --c3: #e2a34b; --c4: #b393f2; --c5: #4cc4cc; --c6: #ea7fbf; --c7: #c2c26a;
+  --gap: #e2a34b; --mi: #b393f2; --green: #52c48a; --red: #f0776a;
+  --c0-soft: rgba(240,119,106,.18); --c1-soft: rgba(110,168,236,.18); --c2-soft: rgba(82,196,138,.16); --gap-soft: rgba(226,163,75,.2); --mi-soft: rgba(179,147,242,.2); --green-soft: rgba(82,196,138,.16); --red-soft: rgba(240,119,106,.18);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 0 80px; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding-inline: 16px; } .rail { display: none; } }
+
+/* top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.topbar-in { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; }
+.brand span { color: var(--mi); }
+.chips { display: none; overflow-x: auto; gap: 6px; flex: 1; min-width: 0; scrollbar-width: none; }
+.chips a { font-family: var(--mono); font-size: 12px; white-space: nowrap; padding: 4px 9px; border: 1px solid var(--rule); border-radius: 99px; color: var(--ink); text-decoration: none; }
+@media (max-width: 900px) { .chips { display: flex; } .topbar-in { padding: 10px 16px; flex-wrap: wrap; row-gap: 8px; } .brand { display: none; } }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.score { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; padding: 5px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--rule); }
+.score b { color: var(--green); }
+.lvpick { display: inline-flex; border: 1px solid var(--rule); border-radius: 99px; overflow: hidden; background: var(--surface); }
+.lvpick button { font-family: var(--mono); font-size: 11.5px; padding: 5px 9px; border: 0; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lvpick button.on { background: var(--mi); color: #fff; }
+@media (max-width: 900px) { .tb-right { margin-left: 0; width: 100%; justify-content: space-between; } }
+
+/* rail */
+.rail nav { position: sticky; top: 70px; padding-top: 40px; display: flex; flex-direction: column; gap: 2px; }
+.rail a { display: grid; grid-template-columns: 70px 1fr; gap: 4px; padding: 6px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-family: var(--display); font-size: 14.5px; line-height: 1.3; }
+.rail a .n { font-family: var(--mono); font-size: 11.5px; padding-top: 2px; }
+.rail a:hover, .rail a.on { color: var(--ink); background: var(--sunk); }
+
+main { min-width: 0; }
+header.hero { padding-block: 48px 28px; border-bottom: 1px solid var(--rule); }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 5.5vw, 58px); line-height: 1.02; letter-spacing: -.025em; margin: 10px 0 16px; text-wrap: balance; }
+h1 .m { color: var(--mi); }
+.lede { max-width: 66ch; color: var(--muted); font-size: 18px; margin: 0 0 12px; }
+.levelcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+@media (max-width: 760px) { .levelcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.levelcards button { text-align: left; font-family: var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+.levelcards button b { display: block; font-family: var(--display); font-size: 17px; }
+.levelcards button span { font-size: 14px; color: var(--muted); line-height: 1.35; display: block; margin-top: 2px; }
+.levelcards button.on { border-color: var(--mi); box-shadow: inset 0 0 0 1.5px var(--mi); background: var(--mi-soft); }
+.legend3 { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 22px; font-family: var(--mono); font-size: 12.5px; }
+.legend3 span { display: inline-flex; align-items: center; gap: 8px; }
+.legend3 i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+section.sec { padding-block: 56px 8px; border-bottom: 1px solid var(--rule); scroll-margin-top: 60px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.secnum { font-family: var(--mono); font-size: 13px; color: var(--mi); border: 1px solid currentColor; border-radius: 4px; padding: 1px 7px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.intro { max-width: 66ch; }
+.intro p { margin: 12px 0; }
+
+.block { margin-top: 28px; }
+.blabel { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.blabel::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.blabel .tag { color: var(--surface); background: var(--ink); padding: 2px 7px; border-radius: 3px; letter-spacing: .06em; }
+.block.math .blabel .tag { background: var(--c1); }
+.block.quiz .blabel .tag { background: var(--green); }
+.block.play .blabel .tag { background: var(--mi); }
+.block.lv .blabel .tag { background: var(--gap); }
+
+/* level explanations */
+.lvcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 0; overflow: hidden; }
+.lvtabs { display: flex; border-bottom: 1px solid var(--rule); background: var(--sunk); overflow-x: auto; scrollbar-width: none; }
+.lvtabs button { font-family: var(--mono); font-size: 12px; padding: 9px 14px; border: 0; border-right: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lvtabs button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--mi); }
+.lvbody { padding: 6px 20px 14px; }
+.lvbody > div { max-width: 68ch; }
+.lvbody p, .lvbody li { margin: 10px 0; }
+.lvbody ul, .lvbody ol { padding-left: 22px; }
+.lvbody .big { font-size: 19px; }
+
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; }
+.panel + .panel { margin-top: 16px; }
+.panel h4 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0 0 4px; }
+.hint { font-size: 14.5px; color: var(--muted); margin: 0 0 12px; }
+.two { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.two-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .two, .two-even { grid-template-columns: minmax(0, 1fr); } }
+.cap { font-family: var(--mono); font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+
+svg.plot { width: 100%; height: auto; display: block; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
+svg.drag { cursor: crosshair; }
+svg:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--mi); outline-offset: 2px; }
+.ax { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.axl { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+.lbl { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.gridl { stroke: var(--rule); stroke-width: 1; }
+.base { stroke: var(--muted); stroke-width: 1; }
+.handle { cursor: grab; }
+
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+.stat { background: var(--sunk); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.stat .k { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.stat .v { font-family: var(--display); font-weight: 700; font-size: 23px; font-variant-numeric: tabular-nums; line-height: 1.15; overflow-wrap: anywhere; }
+.stat.r .v { color: var(--red); } .stat.b .v { color: var(--c1); } .stat.a .v { color: var(--gap); } .stat.g .v { color: var(--green); } .stat.m .v { color: var(--mi); }
+.chain { font-family: var(--mono); font-size: 13px; background: var(--sunk); border-radius: 8px; padding: 10px 14px; margin-top: 12px; line-height: 1.8; overflow-x: auto; }
+.chain .ok { color: var(--green); font-weight: 600; } .chain .bad { color: var(--red); font-weight: 600; } .chain .a { color: var(--gap); font-weight: 600; } .chain .mu { color: var(--muted); } .chain .m { color: var(--mi); font-weight: 600; }
+.verdict { font-family: var(--display); font-weight: 700; font-size: 20px; margin: 12px 0 0; }
+
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+button.b { font-family: var(--mono); font-size: 12.5px; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+button.b:hover:not(:disabled) { border-color: var(--ink); }
+button.b:disabled { opacity: .4; cursor: default; }
+button.b.pri { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btns .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
+.btns .lab { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+label.chk { font-family: var(--mono); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.seg button { font-family: var(--mono); font-size: 12px; padding: 7px 11px; border: 0; border-right: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--mi); color: #fff; }
+
+.ctrl { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; align-items: center; gap: 10px; margin: 6px 0; font-family: var(--mono); font-size: 13px; }
+.ctrl label { color: var(--muted); }
+.ctrl output { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .ctrl { grid-template-columns: 110px minmax(0, 1fr) 54px; font-size: 12px; } }
+input[type=range] { width: 100%; accent-color: var(--mi); }
+
+/* probability bars */
+.postbars { display: grid; gap: 5px; font-family: var(--mono); font-size: 12px; }
+.postbars .r { display: grid; grid-template-columns: 74px minmax(0, 1fr) 54px; gap: 8px; align-items: center; }
+.postbars .bar { height: 16px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.postbars .bar i { display: block; height: 100%; transition: width .2s; }
+.postbars .v { text-align: right; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .postbars .bar i { transition: none; } }
+
+table.t { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.t th, table.t td { padding: 5px 8px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+table.t th:first-child, table.t td:first-child { text-align: left; }
+table.t th { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+table.t td.mu { color: var(--muted); }
+table.t.wrap td:first-child { white-space: normal; }
+table.t tr.tot td { border-top: 2px solid var(--rule); font-weight: 600; }
+.scroll { overflow-x: auto; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+/* math */
+.mathcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 6px 20px 16px; }
+.mathcard + .mathcard { margin-top: 16px; }
+.mathcard h4 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 16px 0 4px; }
+.mathcard p, .mathcard li { max-width: 68ch; }
+.eq { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; margin: 10px 0 !important; padding: 2px 0; }
+.tr { color: var(--red); } .tb { color: var(--c1); } .ta { color: var(--gap); } .tg { color: var(--green); } .tm { color: var(--mi); }
+.steps { counter-reset: st; list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 4px; }
+.steps > li { counter-increment: st; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px dashed var(--rule); }
+.steps > li::before { content: counter(st); font-family: var(--mono); font-size: 12px; color: var(--surface); background: var(--c1); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 4px; }
+.steps .why { color: var(--muted); font-size: 15px; }
+.steps > li > div { min-width: 0; }
+.steps > li > div, .lvbody p, .lvbody li, .mathcard p { overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+.note { border-left: 3px solid var(--gap); padding: 6px 14px; margin: 14px 0; font-size: 15.5px; background: var(--sunk); border-radius: 0 6px 6px 0; }
+
+/* quiz */
+.quizbox { display: grid; gap: 14px; }
+.qq { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+.qq .qt { font-weight: 600; margin: 0 0 10px; }
+.qq .qt .qn { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-right: 8px; font-weight: 400; }
+.qq .qt .ql { font-family: var(--mono); font-size: 11px; color: var(--gap); border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; margin-left: 8px; font-weight: 400; white-space: nowrap; }
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 600px) { .opts { grid-template-columns: minmax(0, 1fr); } }
+.opt { text-align: left; font-family: var(--body); font-size: 15.5px; line-height: 1.4; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--rule); background: var(--bg); color: var(--ink); cursor: pointer; }
+.opt:hover:not(:disabled) { border-color: var(--ink); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--green); background: var(--green-soft); }
+.opt.wrong { border-color: var(--red); background: var(--red-soft); }
+.why-ans { margin: 10px 0 0; font-size: 15px; padding: 8px 12px; border-radius: 6px; background: var(--sunk); }
+.why-ans b.ok { color: var(--green); } .why-ans b.no { color: var(--red); }
+.quizfoot { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--muted); gap: 10px; flex-wrap: wrap; }
+
+table.vs { border-collapse: collapse; width: 100%; font-size: 15px; }
+table.vs th, table.vs td { padding: 9px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+table.vs thead th { font-family: var(--display); font-size: 16px; }
+table.vs tbody th { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+
+footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+
+/* additions for this lab */
+table.t tr.on td { background: var(--mi-soft); font-weight: 600; }
+table.t td.c, table.t th.c { text-align: center; }
+.yes { color: var(--green); font-weight: 600; } .no { color: var(--muted); }
+.legend3 i.ln { width: 18px; height: 3px; border-radius: 2px; }
+.legend3 i.band { width: 18px; height: 10px; border-radius: 2px; }
+.legend3 i.dash { width: 18px; height: 0; border-radius: 0; border-top: 2px dashed var(--ink); background: none !important; }
+.cell { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.gm-node { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.gm-node.obs { fill: var(--sunk); }
+.gm-lab { font-family: var(--mono); font-size: 13px; fill: var(--ink); }
+textarea.words { width: 100%; font-family: var(--mono); font-size: 13px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 7px; background: var(--bg); color: var(--ink); resize: vertical; min-height: 44px; }
+.verdict.ok { color: var(--green); } .verdict.bad { color: var(--red); } .verdict.meh { color: var(--gap); }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.legend3 i.sq { border-radius: 2px; }
+.legend3 i.ring { background: none !important; border: 2px solid var(--ink); width: 14px; height: 14px; }
+.legend3 i.ringc { background: none !important; border: 2px dashed var(--gap); width: 14px; height: 14px; }
+.hov { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 1.6em; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">Support <span>Vector</span> Machine Lab</div>
+  <div class="chips">
+    <a href="#margin">17.3.1</a><a href="#dual">17.3.2</a><a href="#soft">17.3.3</a><a href="#kernel">17.3.4</a><a href="#cheat">Sheet</a>
+  </div>
+  <div class="tb-right">
+    <div class="lvpick" id="lvpick" role="group" aria-label="Explanation level">
+      <button data-setl="1">Kid</button><button data-setl="2">High school</button><button data-setl="3">Undergrad</button><button data-setl="4">Grad</button>
+    </div>
+    <div class="score" id="score">Quiz <b>0</b> / 0</div>
+  </div>
+</div></div>
+
+<div class="wrap">
+<aside class="rail"><nav id="rail">
+  <a href="#margin"><span class="n">17.3.1</span>Large margin classifiers</a>
+  <a href="#dual"><span class="n">17.3.2</span>The dual problem</a>
+  <a href="#soft"><span class="n">17.3.3</span>Soft margin classifiers</a>
+  <a href="#kernel"><span class="n">17.3.4</span>The kernel trick</a>
+  <a href="#cheat"><span class="n">—</span>Cheat sheet</a>
+</nav></aside>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">Murphy, <i>Probabilistic Machine Learning</i> · Chapter 17 · §17.3 – §17.3.4</div>
+  <h1>Draw the <span class="m">widest street</span> between two classes. Only the points on the curb matter.</h1>
+  <p class="lede">A <b>support vector machine</b> predicts with \(f(\mathbf x)=\sum_{i=1}^N\alpha_iK(\mathbf x,\mathbf x_i)\) (Eq. 17.63), a weighted sum of kernels centered at the training points. The training problem is set up so that most \(\alpha_i\) come out <b>exactly zero</b>. The few points with \(\alpha_i\gt0\) are the <b>support vectors</b>, and at test time they are the only training points you need.</p>
+  <p class="lede">The route there: pick the separating line with the <b>largest margin</b> (17.3.1), rewrite that problem in terms of one multiplier per point (17.3.2), let some points break the rules for a price \(C\) (17.3.3), and swap every dot product for a kernel (17.3.4). Labels are \(\tilde y\in\{-1,+1\}\) throughout.</p>
+  <p class="lede">Every section has four parts: <b>Explain it</b> at your level, <b>Play</b>, <b>Math, slowly</b>, and <b>Check yourself</b>. Your quiz score sits in the top bar.</p>
+  <div class="levelcards" id="levelcards">
+    <button data-setl="1"><b>Kid</b><span>Elementary school. Stories, no symbols.</span></button>
+    <button data-setl="2"><b>High school</b><span>Lines, distances, a bit of algebra.</span></button>
+    <button data-setl="3"><b>Undergrad</b><span>Vectors, Lagrange multipliers, the book's equations.</span></button>
+    <button data-setl="4"><b>Grad / MLE</b><span>Duality, hinge loss, what libraries actually do.</span></button>
+  </div>
+  <p class="hint" style="margin-top:10px">Pick a level here or in the top bar. Every "Explain it" box switches to match, and you can still flip tabs one box at a time.</p>
+  <div class="legend3">
+    <span><i style="background:var(--c0)"></i>class ỹ = +1</span>
+    <span><i class="sq" style="background:var(--c1)"></i>class ỹ = −1</span>
+    <span><i class="ln" style="background:var(--ink)"></i>decision boundary f = 0</span>
+    <span><i class="dash"></i>margins f = ±1</span>
+    <span><i class="ring"></i>support vector</span>
+    <span><i class="ringc"></i>support vector with slack (α = C)</span>
+  </div>
+</header>
+
+<!-- ============ 17.3.1 Large margin classifiers ============ -->
+<section class="sec" id="margin">
+  <div class="sec-head"><span class="secnum">§17.3.1</span><h2>Large margin classifiers: the widest street wins</h2></div>
+  <div class="intro">
+    <p>A linear classifier predicts \(h(\mathbf x)=\operatorname{sign}(f(\mathbf x))\) with \(f(\mathbf x)=\mathbf w^\top\mathbf x+w_0\) (Eq. 17.64). When the classes can be separated, infinitely many lines do it. The SVM picks the one with the largest <b>margin</b>: the distance from the boundary to the <i>closest</i> training point. A wide margin leaves room for the data to wobble without changing any prediction.</p>
+    <p>The signed distance of \(\mathbf x\) from the boundary is \(r=f(\mathbf x)/\lVert\mathbf w\rVert\) (Eqs. 17.65–17.66). Rescaling \(\mathbf w,w_0\) doesn't move the line, so we fix the scale by asking the closest point to have \(\tilde y f=1\). Maximizing the margin \(1/\lVert\mathbf w\rVert\) then becomes \(\min\tfrac12\lVert\mathbf w\rVert^2\) subject to \(\tilde y_n(\mathbf w^\top\mathbf x_n+w_0)\ge1\) for every \(n\) (Eq. 17.68).</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Build the widest road you can between two groups of houses.</p>
+        <p>Red houses are on one side of town, blue houses on the other. You have to build a straight road between them. Lots of roads would work, but a skinny road squeezed right next to a red house is risky: if a new red house gets built a little closer, it ends up on the wrong side.</p>
+        <p>So build the <b>widest</b> straight road that doesn't knock down any house. The houses touching the edges of the road are the important ones. They're the <b>support vectors</b>. You could erase every other house and the road would stay in exactly the same place.</p>
+        <p>One more thing: measure in the same units in every direction. If one direction is measured in inches and the other in miles, the "widest road" comes out silly.</p>
+      </div>
+      <div data-l="2">
+        <p>Any straight line can be written as \(w_1x_1+w_2x_2+w_0=0\). Plug a point into the left side and you get a score \(f(\mathbf x)\). Positive means one side of the line, negative means the other. The actual distance from the line is the score divided by the length of the arrow \(\mathbf w=(w_1,w_2)\): \(r=f(\mathbf x)/\sqrt{w_1^2+w_2^2}\).</p>
+        <p>The <b>margin</b> of a line is the distance to its closest point. The SVM chooses the line where that closest distance is as big as possible. In the Play box, turn the line yourself and watch the margin, then press "Snap" to see the best one.</p>
+        <p>Doubling every \(w\) doubles every score but doesn't move the line, so the distances stay the same. The SVM uses that freedom to make the closest points score exactly \(\pm1\). After that, a big margin means a short arrow \(\mathbf w\).</p>
+      </div>
+      <div data-l="3">
+        <p>Write any \(\mathbf x\) as its projection onto the boundary plus a step along the unit normal: \(\mathbf x=\mathbf x_\perp+r\,\mathbf w/\lVert\mathbf w\rVert\). Since \(f(\mathbf x_\perp)=0\), \(f(\mathbf x)=r\lVert\mathbf w\rVert\), so \(r=f(\mathbf x)/\lVert\mathbf w\rVert\).</p>
+        <p>Correct classification means \(\tilde y_nf(\mathbf x_n)\gt0\), and the margin is \(\min_n\tilde y_nf(\mathbf x_n)/\lVert\mathbf w\rVert\). That's Eq. 17.67, a max-min problem. It is invariant to \((\mathbf w,w_0)\to(k\mathbf w,kw_0)\), so impose \(\min_n\tilde y_nf_n=1\). The objective becomes \(1/\lVert\mathbf w\rVert\), and maximizing it is the same as minimizing \(\tfrac12\lVert\mathbf w\rVert^2\): a convex quadratic program with \(N\) linear constraints (Eq. 17.68).</p>
+        <p>The width of the "street" between \(f=-1\) and \(f=+1\) is \(2/\lVert\mathbf w\rVert\). Because distance uses every coordinate equally, standardize features first (Fig. 17.14).</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Uniqueness.</b> \(\tfrac12\lVert\mathbf w\rVert^2\) is strictly convex in \(\mathbf w\) and the feasible set is a polyhedron, so \(\hat{\mathbf w}\) is unique whenever the data are separable. \(\hat w_0\) is unique too once there's at least one support vector from each class.</li>
+          <li><b>Geometry.</b> The max-margin hyperplane is the perpendicular bisector of the shortest segment between the two classes' <i>convex hulls</i>. The hard-margin dual is equivalent to that nearest-points problem.</li>
+          <li><b>Why margin.</b> Classical bounds for linear classifiers with \(\lVert\mathbf x\rVert\le R\) and margin \(\gamma\) scale with \(R^2/\gamma^2\) instead of the dimension. This is why SVMs did well in very high-dimensional feature spaces.</li>
+          <li><b>Implicit bias.</b> Gradient descent on the logistic loss for separable data converges in direction to the hard-margin SVM solution (Soudry et al., 2018). Max margin turns out to be what unregularized logistic regression is heading toward.</li>
+          <li><b>Scaling.</b> The margin is a Euclidean quantity, so the solution is not invariant to per-feature rescaling. <code>StandardScaler</code> before <code>SVC</code> is not optional (Fig. 17.14).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Turn the line yourself, then find the widest street</h3>
+    <div class="panel">
+      <p class="hint">Drag any point. Rotate and slide <b>your line</b> with the sliders. The shaded band is your margin: it reaches out to your closest point on each side. Click a point to see the geometry of Fig. 17.13(a): its projection \(\mathbf x_\perp\), its signed distance \(r\), and the normal \(\mathbf w\).</p>
+      <svg class="plot drag" id="mg-svg" viewBox="0 0 640 480" aria-label="Two classes of points, a movable line and its margin"></svg>
+      <div class="two" style="margin-top:8px">
+        <div>
+          <div class="ctrl"><label for="mg-th">angle of w (°)</label><input type="range" id="mg-th" min="0" max="359" step="1" value="20"><output id="mg-th-o">20</output></div>
+          <div class="ctrl"><label for="mg-s">offset w₀/‖w‖</label><input type="range" id="mg-s" min="-3" max="3" step="0.01" value="0.40"><output id="mg-s-o">0.40</output></div>
+          <div class="ctrl"><label for="mg-k">scale ‖w‖</label><input type="range" id="mg-k" min="0.2" max="3" step="0.01" value="1"><output id="mg-k-o">1.00</output></div>
+          <div class="btns"><button class="b pri" id="mg-snap">Snap to max margin</button><button class="b" id="mg-canon">Rescale so closest ỹf = 1</button><button class="b" id="mg-reset">Reset points</button></div>
+          <div class="btns"><label class="chk"><input type="checkbox" id="mg-best"> show the best line too</label></div>
+        </div>
+        <div>
+          <div class="readout" style="margin-top:0">
+            <div class="stat m"><div class="k">your margin</div><div class="v" id="mg-m">–</div></div>
+            <div class="stat g"><div class="k">best possible 1/‖ŵ‖</div><div class="v" id="mg-best-v">–</div></div>
+            <div class="stat a"><div class="k">ỹf at closest</div><div class="v" id="mg-yf">–</div></div>
+          </div>
+          <p class="verdict" id="mg-verdict">–</p>
+        </div>
+      </div>
+      <div class="chain" id="mg-chain"></div>
+    </div>
+
+    <div class="panel">
+      <h4>Scale your features first (Fig. 17.14)</h4>
+      <p class="hint">Four points: two features, one of them measured on a much bigger scale. Stretch \(x_1\) with the slider. Left: the max-margin line fit to the raw numbers. Right: the same points standardized, with the max-margin line fit there (solid) and the raw solution carried over (dashed). Margins in the readout are measured in standardized units.</p>
+      <div class="ctrl"><label for="fs-m">x₁ stretched by</label><input type="range" id="fs-m" min="1" max="25" step="0.5" value="20"><output id="fs-m-o">×20</output></div>
+      <div class="two-even">
+        <div><p class="cap">unscaled: fit on raw x₀, x₁</p><svg class="plot" id="fs-raw" viewBox="0 0 320 260" aria-label="Unscaled max margin classifier"></svg></div>
+        <div><p class="cap">scaled: both features standardized</p><svg class="plot" id="fs-std" viewBox="0 0 320 260" aria-label="Scaled max margin classifier"></svg></div>
+      </div>
+      <div class="readout">
+        <div class="stat r"><div class="k">raw fit: margin (std units)</div><div class="v" id="fs-mr">–</div></div>
+        <div class="stat g"><div class="k">scaled fit: margin</div><div class="v" id="fs-ms">–</div></div>
+        <div class="stat"><div class="k">support vectors raw / scaled</div><div class="v" id="fs-sv">–</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 17.63 – 17.68</h3>
+    <div class="mathcard">
+      <h4>The model</h4>
+      <div class="eq">\[ f(\mathbf x)=\sum_{i=1}^N\alpha_iK(\mathbf x,\mathbf x_i)\quad\text{(17.63)}\qquad h(\mathbf x)=\operatorname{sign}(f(\mathbf x)),\quad f(\mathbf x)=\mathbf w^\top\mathbf x+w_0 \tag{17.64} \]</div>
+      <p>Section 17.3.4 shows these are the same thing: the linear \(f\) is 17.63 with a linear kernel, plus a bias.</p>
+
+      <h4>Distance to the boundary</h4>
+      <ol class="steps">
+        <li><div>Split \(\mathbf x\) into a point on the boundary plus a step along the unit normal:
+          \[ \mathbf x=\mathbf x_\perp+r\frac{\mathbf w}{\lVert\mathbf w\rVert} \tag{17.65} \]
+          <span class="why">\(\mathbf w\) is perpendicular to the boundary, so the shortest path off it runs along \(\mathbf w\). \(r\) is signed: positive on the side \(\mathbf w\) points to.</span></div></li>
+        <li><div>Apply \(f\):
+          \[ f(\mathbf x)=\mathbf w^\top\mathbf x+w_0=(\mathbf w^\top\mathbf x_\perp+w_0)+r\frac{\mathbf w^\top\mathbf w}{\lVert\mathbf w\rVert}=(\mathbf w^\top\mathbf x_\perp+w_0)+r\lVert\mathbf w\rVert \tag{17.66} \]
+          <span class="why">\(\mathbf w^\top\mathbf w=\lVert\mathbf w\rVert^2\), and one factor cancels.</span></div></li>
+        <li><div>\(\mathbf x_\perp\) is on the boundary, so \(\mathbf w^\top\mathbf x_\perp+w_0=0\), leaving
+          \[ r=\frac{f(\mathbf x)}{\lVert\mathbf w\rVert}. \]
+          <span class="why">The boundary sits at signed distance \(-w_0/\lVert\mathbf w\rVert\) from the origin. That's the "offset" slider in the Play box.</span></div></li>
+      </ol>
+
+      <h4>From max-min to a quadratic program</h4>
+      <ol class="steps">
+        <li><div>We want every point on its correct side, \(\tilde y_nf(\mathbf x_n)\gt0\), and the closest one as far as possible:
+          \[ \max_{\mathbf w,w_0}\ \frac{1}{\lVert\mathbf w\rVert}\min_{n=1}^N\big[\tilde y_n(\mathbf w^\top\mathbf x_n+w_0)\big] \tag{17.67} \]
+          <span class="why">Multiplying by \(\tilde y_n\) turns "on the correct side" into "positive" for both classes.</span></div></li>
+        <li><div>Replace \((\mathbf w,w_0)\) by \((k\mathbf w,kw_0)\): the numerator and \(\lVert\mathbf w\rVert\) both scale by \(k\), so nothing changes. Choose \(k\) so the closest point has \(\tilde y_nf_n=1\). <span class="why">Try the "scale ‖w‖" slider and then the "Rescale" button: the line and the margin stay put while every \(f\) value changes.</span></div></li>
+        <li><div>With that scale, every point has \(\tilde y_nf_n\ge1\), and the objective is \(1/\lVert\mathbf w\rVert\). Maximizing it is minimizing \(\lVert\mathbf w\rVert\), which is minimizing \(\tfrac12\lVert\mathbf w\rVert^2\):
+          \[ \min_{\mathbf w,w_0}\ \tfrac12\lVert\mathbf w\rVert^2\quad\text{s.t.}\quad\tilde y_n(\mathbf w^\top\mathbf x_n+w_0)\ge1,\quad n=1:N \tag{17.68} \]
+          <span class="why">Squaring removes the square root and makes the objective a smooth quadratic. The \(\tfrac12\) only tidies the derivative.</span></div></li>
+      </ol>
+
+      <h4>A worked example</h4>
+      <p>Two points: \(\mathbf x_1=(1,0)\) with \(\tilde y=+1\) and \(\mathbf x_2=(-1,0)\) with \(\tilde y=-1\). By symmetry the boundary is the vertical axis, \(\mathbf w=(w,0)\), \(w_0=0\). The constraints say \(w\cdot1\ge1\) and \(-(w\cdot(-1))\ge1\), so \(w\ge1\). The smallest \(\lVert\mathbf w\rVert\) is \(w=1\), the margin is \(1/\lVert\mathbf w\rVert=1\), and the street from \(x=-1\) to \(x=1\) has width \(2/\lVert\mathbf w\rVert=2\). Both points are support vectors.</p>
+      <div class="note">Why scale (Fig. 17.14): distance \(\sqrt{\Delta x_0^2+\Delta x_1^2}\) is dominated by whichever feature has the larger numbers. Stretch \(x_1\) by 20 and the max-margin problem mostly cares about \(x_1\), so the boundary goes nearly horizontal. Standardizing puts both features on equal footing.</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Large margin classifiers</h3><div class="quizbox" data-quiz="margin"></div></div>
+</section>
+
+<!-- ============ 17.3.2 The dual problem ============ -->
+<section class="sec" id="dual">
+  <div class="sec-head"><span class="secnum">§17.3.2</span><h2>The dual problem: one multiplier per point, and most are zero</h2></div>
+  <div class="intro">
+    <p>Problem 17.68 is the <b>primal</b>: \(D+1\) unknowns \((\mathbf w,w_0)\) and \(N\) constraints. Give each constraint a Lagrange multiplier \(\alpha_n\ge0\), eliminate \(\mathbf w\) and \(w_0\), and you get the <b>dual</b>: maximize \(\sum_n\alpha_n-\tfrac12\sum_{i,j}\alpha_i\alpha_j\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j\) subject to \(\alpha_n\ge0\) and \(\sum_n\alpha_n\tilde y_n=0\) (Eq. 17.77).</p>
+    <p>The answer comes back as \(\hat{\mathbf w}=\sum_n\hat\alpha_n\tilde y_n\mathbf x_n\) (Eq. 17.73). The KKT condition \(\alpha_n(\tilde y_nf(\mathbf x_n)-1)=0\) says each point either has \(\alpha_n=0\) or sits exactly on the margin. The points with \(\alpha_n\gt0\) are the <b>support vectors</b>.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Every house gets a "how hard am I pushing on the road" number.</p>
+        <p>Imagine each house can push on the edge of the road to keep it away. Houses far from the road don't touch it, so they push with zero force. Only the houses right at the edge push.</p>
+        <p>When everything settles, the road's direction is just the pushes added up. Red houses push one way, blue houses push the other way, and the pushes from the two sides balance out exactly.</p>
+        <p>The "dual problem" is a way of finding the road by figuring out how hard each house pushes. Most of the numbers come out zero, which is what makes it handy.</p>
+      </div>
+      <div data-l="2">
+        <p>Instead of solving for the line directly, the SVM solves for one number \(\alpha_n\ge0\) per training point. Then the line's arrow is a weighted sum of the points: \(\mathbf w=\sum_n\alpha_n\tilde y_n\mathbf x_n\). Red points (\(\tilde y=+1\)) add their position, blue points subtract theirs.</p>
+        <p>Two rules come out of the math. The weights on the red side and the blue side have to balance: \(\sum_n\alpha_n\tilde y_n=0\). And a point only gets a nonzero weight if it is sitting right on the edge of the street, with score exactly \(\pm1\).</p>
+        <p>The Play box solves for the \(\alpha\)s one pair at a time. Step through it and watch the bars: most go to zero, and only the points on the dashed margin lines keep a bar.</p>
+      </div>
+      <div data-l="3">
+        <p>Lagrangian: \(L=\tfrac12\mathbf w^\top\mathbf w-\sum_n\alpha_n(\tilde y_n(\mathbf w^\top\mathbf x_n+w_0)-1)\). Setting \(\nabla_{\mathbf w}L=0\) gives \(\mathbf w=\sum_n\alpha_n\tilde y_n\mathbf x_n\), and \(\partial L/\partial w_0=0\) gives \(\sum_n\alpha_n\tilde y_n=0\). Substituting back removes \(\mathbf w\) and \(w_0\) and leaves a concave quadratic in \(\boldsymbol\alpha\) (17.77).</p>
+        <p>The data enter only through the inner products \(\mathbf x_i^\top\mathbf x_j\). That is the opening for the kernel trick in 17.3.4.</p>
+        <p>KKT (17.78–17.80): \(\alpha_n\ge0\), \(\tilde y_nf_n\ge1\), and complementary slackness \(\alpha_n(\tilde y_nf_n-1)=0\). Prediction needs only the support vectors (17.81). For \(\hat w_0\), any support vector satisfies \(\tilde y_nf_n=1\), so \(\hat w_0=\tilde y_n-\hat{\mathbf w}^\top\mathbf x_n\). Averaging over all of them (17.82) is more stable numerically.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Strong duality.</b> The primal is convex with affine constraints, so Slater's condition (in its refined form for affine constraints) holds whenever the problem is feasible. Primal and dual optima are equal: \(\tfrac12\lVert\hat{\mathbf w}\rVert^2=\sum_n\hat\alpha_n-\tfrac12\lVert\hat{\mathbf w}\rVert^2\), so \(\sum_n\hat\alpha_n=\lVert\hat{\mathbf w}\rVert^2\). Check it in the Play box.</li>
+          <li><b>When the dual pays off.</b> The dual has \(N\) variables, the primal \(D+1\). For a linear SVM with \(N\gg D\), solve the primal (LIBLINEAR, Pegasos SGD). The dual wins when \(D\) is huge or infinite, which is exactly the kernel case.</li>
+          <li><b>SMO.</b> Because of \(\sum\alpha_n\tilde y_n=0\), the smallest update changes two multipliers, and that 2-variable QP has a closed-form solution. LIBSVM picks the pair with a second-order rule (Fan, Chen &amp; Lin, 2005). That's the solver running in the Play box.</li>
+          <li><b>Sparsity ≠ uniqueness.</b> \(\hat{\mathbf w}\) is unique but \(\hat{\boldsymbol\alpha}\) need not be: with degenerate data (e.g. three collinear points on one margin) several \(\boldsymbol\alpha\)'s give the same \(\mathbf w\). The set of "support vectors" can depend on the solver.</li>
+          <li><b>Leave-one-out.</b> Removing a non-support vector leaves the solution unchanged, so LOO error \(\le\#\text{SV}/N\).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Solve the dual one pair at a time</h3>
+    <div class="panel">
+      <p class="hint">This is SMO: each step picks two points \(i,j\) (outlined in purple) and moves \(\alpha_i,\alpha_j\) in the direction that keeps \(\sum\alpha_n\tilde y_n=0\). The line shown is built from the current \(\boldsymbol\alpha\) by Eqs. 17.73 and 17.82. Drag points to change the problem. The solver reruns and jumps to the answer.</p>
+      <div class="two">
+        <div>
+          <svg class="plot drag" id="du-svg" viewBox="0 0 640 480" aria-label="Hard margin SVM built from the current dual variables"></svg>
+          <div class="btns"><button class="b" id="du-zero">Reset α = 0</button><button class="b" id="du-step">Step</button><button class="b pri" id="du-run">Run to the end</button><button class="b" id="du-reset">Reset points</button><span class="lab" id="du-it"></span></div>
+        </div>
+        <div>
+          <p class="cap">α<sub>n</sub> for each point (red ỹ = +1, blue ỹ = −1)</p>
+          <svg class="plot" id="du-alpha" viewBox="0 0 320 170" aria-label="Dual variables"></svg>
+          <p class="cap" style="margin-top:10px">dual objective L(α) by step, with the primal optimum ‖ŵ‖²/2 dashed</p>
+          <svg class="plot" id="du-obj" viewBox="0 0 320 150" aria-label="Dual objective by iteration"></svg>
+        </div>
+      </div>
+      <div class="readout">
+        <div class="stat m"><div class="k">dual L(α)</div><div class="v" id="du-L">–</div></div>
+        <div class="stat g"><div class="k">primal ‖ŵ‖²/2</div><div class="v" id="du-P">–</div></div>
+        <div class="stat"><div class="k">Σ αₙỹₙ</div><div class="v" id="du-sum">–</div></div>
+        <div class="stat a"><div class="k">support vectors</div><div class="v" id="du-nsv">–</div></div>
+      </div>
+      <p class="verdict" id="du-verdict"></p>
+      <div class="chain" id="du-chain"></div>
+      <p class="cap" style="margin-top:14px">KKT check (17.78–17.80): every row needs α ≥ 0, ỹf − 1 ≥ 0, and their product = 0</p>
+      <div class="scroll"><table class="t" id="du-kkt"></table></div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 17.69 – 17.82</h3>
+    <div class="mathcard">
+      <h4>Lagrangian and stationarity</h4>
+      <div class="eq">\[ L(\mathbf w,w_0,\boldsymbol\alpha)=\tfrac12\mathbf w^\top\mathbf w-\sum_{n=1}^N\alpha_n\big(\tilde y_n(\mathbf w^\top\mathbf x_n+w_0)-1\big) \tag{17.69} \]</div>
+      <div class="eq">\[ (\hat{\mathbf w},\hat w_0,\hat{\boldsymbol\alpha})=\min_{\mathbf w,w_0}\max_{\boldsymbol\alpha\ge0}L(\mathbf w,w_0,\boldsymbol\alpha) \tag{17.70} \]</div>
+      <ol class="steps">
+        <li><div>Why the inner max enforces the constraints: if some \(\tilde y_nf_n-1\lt0\), sending \(\alpha_n\to\infty\) sends \(L\to\infty\). If all constraints hold, the best choice is \(\alpha_n=0\) wherever \(\tilde y_nf_n\gt1\), and \(L=\tfrac12\lVert\mathbf w\rVert^2\). <span class="why">So \(\max_{\boldsymbol\alpha}L\) equals the primal objective on feasible points and \(+\infty\) elsewhere.</span></div></li>
+        <li><div>Differentiate:
+          \[ \nabla_{\mathbf w}L=\mathbf w-\sum_n\alpha_n\tilde y_n\mathbf x_n\quad\text{(17.71)}\qquad \frac{\partial L}{\partial w_0}=-\sum_n\alpha_n\tilde y_n \tag{17.72} \]</div></li>
+        <li><div>Set both to zero:
+          \[ \hat{\mathbf w}=\sum_n\hat\alpha_n\tilde y_n\mathbf x_n\quad\text{(17.73)}\qquad 0=\sum_n\hat\alpha_n\tilde y_n \tag{17.74} \]
+          <span class="why">\(\hat{\mathbf w}\) lives in the span of the training points. The red and blue multipliers balance.</span></div></li>
+      </ol>
+
+      <h4>Substituting back</h4>
+      <ol class="steps">
+        <li><div>Expand 17.69:
+          \[ L=\tfrac12\hat{\mathbf w}^\top\hat{\mathbf w}-\sum_n\alpha_n\tilde y_n\hat{\mathbf w}^\top\mathbf x_n-w_0\sum_n\alpha_n\tilde y_n+\sum_n\alpha_n \tag{17.75} \]</div></li>
+        <li><div>The second sum is \(\hat{\mathbf w}^\top\sum_n\alpha_n\tilde y_n\mathbf x_n=\hat{\mathbf w}^\top\hat{\mathbf w}\), and the third is \(w_0\cdot0\):
+          \[ L=\tfrac12\hat{\mathbf w}^\top\hat{\mathbf w}-\hat{\mathbf w}^\top\hat{\mathbf w}-0+\sum_n\alpha_n \tag{17.76} \]</div></li>
+        <li><div>Write \(\hat{\mathbf w}^\top\hat{\mathbf w}=\sum_i\sum_j\alpha_i\alpha_j\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j\):
+          \[ L(\boldsymbol\alpha)=-\tfrac12\sum_{i=1}^N\sum_{j=1}^N\alpha_i\alpha_j\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j+\sum_{n=1}^N\alpha_n \tag{17.77} \]
+          <span class="why">Maximize over \(\alpha_n\ge0\) with \(\sum_n\alpha_n\tilde y_n=0\). It's concave (the quadratic term is \(-\tfrac12\lVert\sum\alpha_n\tilde y_n\mathbf x_n\rVert^2\)). Generic QP solvers take \(O(N^3)\). SMO takes roughly \(O(N)\) to \(O(N^2)\).</span></div></li>
+      </ol>
+
+      <h4>KKT conditions and support vectors</h4>
+      <div class="eq">\[ \alpha_n\ge0\quad\text{(17.78)}\qquad \tilde y_nf(\mathbf x_n)-1\ge0\quad\text{(17.79)}\qquad \alpha_n\big(\tilde y_nf(\mathbf x_n)-1\big)=0 \tag{17.80} \]</div>
+      <p>For each point, one of the two factors in 17.80 is zero. Either \(\alpha_n=0\) and the point doesn't contribute to \(\hat{\mathbf w}\), or \(\tilde y_nf_n=1\) and it sits on a margin line. Call the second set \(\mathcal S\).</p>
+      <div class="eq">\[ f(\mathbf x;\hat{\mathbf w},\hat w_0)=\hat{\mathbf w}^\top\mathbf x+\hat w_0=\sum_{n\in\mathcal S}\alpha_n\tilde y_n\mathbf x_n^\top\mathbf x+\hat w_0 \tag{17.81} \]</div>
+      <div class="eq">\[ \hat w_0=\frac1{|\mathcal S|}\sum_{n\in\mathcal S}(\tilde y_n-\hat{\mathbf w}^\top\mathbf x_n)=\frac1{|\mathcal S|}\sum_{n\in\mathcal S}\Big(\tilde y_n-\sum_{m\in\mathcal S}\alpha_m\tilde y_m\mathbf x_m^\top\mathbf x_n\Big) \tag{17.82} \]</div>
+      <p>Each term comes from \(\tilde y_n(\hat{\mathbf w}^\top\mathbf x_n+\hat w_0)=1\): multiply both sides by \(\tilde y_n\) and use \(\tilde y_n^2=1\).</p>
+
+      <h4>The two-point example, from the dual side</h4>
+      <p>\(\mathbf x_1=(1,0),\tilde y_1=+1\); \(\mathbf x_2=(-1,0),\tilde y_2=-1\). The constraint \(\alpha_1-\alpha_2=0\) forces \(\alpha_1=\alpha_2=\alpha\). Every term \(\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j\) equals \(+1\), so</p>
+      <div class="eq">\[ L(\alpha)=2\alpha-\tfrac12\cdot4\alpha^2=2\alpha-2\alpha^2\ \Rightarrow\ \hat\alpha=\tfrac12,\quad \hat{\mathbf w}=\tfrac12(1,0)-\tfrac12(-1,0)=(1,0),\quad \hat w_0=1-1=0. \]</div>
+      <p>Same answer as the primal. The dual optimum \(L=1-\tfrac12=\tfrac12\) equals the primal optimum \(\tfrac12\lVert\hat{\mathbf w}\rVert^2=\tfrac12\), and \(\sum\hat\alpha_n=1=\lVert\hat{\mathbf w}\rVert^2\).</p>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>The dual problem</h3><div class="quizbox" data-quiz="dual"></div></div>
+</section>
+
+<!-- ============ 17.3.3 Soft margin ============ -->
+<section class="sec" id="soft">
+  <div class="sec-head"><span class="secnum">§17.3.3</span><h2>Soft margin classifiers: pay C for every rule you break</h2></div>
+  <div class="intro">
+    <p>If the classes overlap, no line satisfies \(\tilde y_nf_n\ge1\) for all \(n\) and the hard-margin problem has no solution. Give each point a <b>slack</b> \(\xi_n\ge0\) and require only \(\tilde y_nf_n\ge1-\xi_n\). Each unit of slack costs \(C\): minimize \(\tfrac12\lVert\mathbf w\rVert^2+C\sum_n\xi_n\) (Eq. 17.83).</p>
+    <p>The dual is the same as before, except the multipliers are now boxed in: \(0\le\alpha_n\le C\) (Eq. 17.86). Points with \(0\lt\alpha_n\lt C\) sit on the margin. Points with \(\alpha_n=C\) are inside it or on the wrong side. Small \(C\) gives a wide, forgiving margin. Large \(C\) approaches the hard margin.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Sometimes a few houses are in the way. Pay a fine and build the road anyway.</p>
+        <p>What if a red house was built in the middle of the blue neighborhood? Now no straight road can keep every red house on one side. So we make a deal: you're allowed to build the road over some houses' yards, or even put a house on the wrong side, but you pay a fine for each one. The farther over the line, the bigger the fine.</p>
+        <p>\(C\) is how big the fine is. A tiny fine means "build a nice wide road, I don't mind a few houses in the way." A huge fine means "don't you dare," and you get a skinny road that tries hard to keep everyone on their side.</p>
+      </div>
+      <div data-l="2">
+        <p>Each point gets a "how much did I break the rule" number \(\xi_n\) (the Greek letter xi). If the point is outside the street on its own side, \(\xi_n=0\). If it's inside the street but still on the right side of the middle line, \(0\lt\xi_n\lt1\). If it's past the middle line, on the wrong side, \(\xi_n\gt1\).</p>
+        <p>The SVM now balances two goals: a wide street (small \(\lVert\mathbf w\rVert\)) and a small total of rule-breaking \(\sum\xi_n\). \(C\) sets the exchange rate. Every misclassified point has \(\xi_n\gt1\), so \(\sum\xi_n\) is at least the number of mistakes.</p>
+        <p>In the Play box, slide \(C\) and watch the street. The orange segments show each point's slack.</p>
+      </div>
+      <div data-l="3">
+        <p>Primal (17.83): \(\min\tfrac12\lVert\mathbf w\rVert^2+C\sum_n\xi_n\) s.t. \(\xi_n\ge0\), \(\tilde y_n(\mathbf x_n^\top\mathbf w+w_0)\ge1-\xi_n\). Lagrangian (17.84) adds multipliers \(\alpha_n\) for the margin constraints and \(\mu_n\) for \(\xi_n\ge0\). Setting \(\partial L/\partial\xi_n=C-\alpha_n-\mu_n=0\) and using \(\mu_n\ge0\) gives \(\alpha_n\le C\). The \(\xi\) terms cancel, and the dual objective is identical to 17.77.</p>
+        <p>Complementary slackness now reads \(\alpha_n(\tilde y_nf_n-1+\xi_n)=0\) and \(\mu_n\xi_n=(C-\alpha_n)\xi_n=0\). So \(\alpha_n=0\Rightarrow\tilde y_nf_n\ge1\); \(0\lt\alpha_n\lt C\Rightarrow\xi_n=0,\ \tilde y_nf_n=1\); \(\alpha_n=C\Rightarrow\xi_n=1-\tilde y_nf_n\ge0\).</p>
+        <p>Compute \(\hat w_0\) from the on-margin set \(\mathcal M=\{0\lt\alpha_n\lt C\}\) only (17.88), because only those points are known to satisfy \(\tilde y_nf_n=1\).</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Hinge loss.</b> At the optimum \(\xi_n=\max(0,1-\tilde y_nf_n)\), so 17.83 is \(\sum_n\ell_{\text{hinge}}(\tilde y_nf_n)+\tfrac1{2C}\lVert\mathbf w\rVert^2\): regularized empirical risk minimization with a convex surrogate of 0-1 loss. \(\lambda=1/C\) (up to an \(N\)).</li>
+          <li><b>Regularization path.</b> \(\hat{\boldsymbol\alpha}(C)\) is piecewise linear in \(C\) (Hastie et al., 2004), so the whole path costs about as much as one fit. The small charts in the Play box trace margin width and #SV along it.</li>
+          <li><b>ν-SVM.</b> Replaces \(C\) with \(\nu\in(0,1]\) (17.89–17.92): \(\nu\) upper-bounds the fraction of margin errors and lower-bounds the fraction of support vectors. Every C-SVM solution is a ν-SVM solution for some \(\nu\) in the bracket the Play box shows.</li>
+          <li><b>Tuning.</b> Search \(C\) on a log grid (and the kernel's scale jointly). With an RBF kernel, \((C,\gamma)\) trade off. Large \(C\) with small \(\gamma\) and small \(C\) with large \(\gamma\) can both fit well.</li>
+          <li><b>Class imbalance.</b> Use per-class \(C_+,C_-\) (sklearn <code>class_weight</code>). The box constraint becomes \(0\le\alpha_n\le C_{\tilde y_n}\).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Turn the price of slack up and down</h3>
+    <div class="panel">
+      <p class="hint">Drag points, or pull the classes apart and together with the overlap slider. Rings mark support vectors: a solid ring is on the margin (\(0\lt\alpha\lt C\)), a dashed orange ring has \(\alpha=C\), and the orange segment is its slack \(\xi\) measured in units of \(1/\lVert\mathbf w\rVert\).</p>
+      <svg class="plot drag" id="sf-svg" viewBox="0 0 640 480" aria-label="Soft margin SVM with slack variables"></svg>
+      <div class="ctrl" style="margin-top:8px"><label for="sf-c">C (log scale)</label><input type="range" id="sf-c" min="-2" max="3" step="0.05" value="0"><output id="sf-c-o">1.00</output></div>
+      <div class="ctrl"><label for="sf-sep">class separation</label><input type="range" id="sf-sep" min="0.5" max="5" step="0.1" value="2.2"><output id="sf-sep-o">2.2</output></div>
+      <div class="btns"><button class="b" id="sf-new">New sample</button><label class="chk"><input type="checkbox" id="sf-xi" checked> show slack ξ</label><label class="chk"><input type="checkbox" id="sf-lab"> label ξ values</label></div>
+      <div class="readout">
+        <div class="stat m"><div class="k">street width 2/‖w‖</div><div class="v" id="sf-w">–</div></div>
+        <div class="stat"><div class="k">support vectors</div><div class="v" id="sf-nsv">–</div></div>
+        <div class="stat b"><div class="k">on margin (0&lt;α&lt;C)</div><div class="v" id="sf-on">–</div></div>
+        <div class="stat a"><div class="k">at bound (α = C)</div><div class="v" id="sf-bd">–</div></div>
+        <div class="stat r"><div class="k">misclassified</div><div class="v" id="sf-mis">–</div></div>
+        <div class="stat g"><div class="k">Σ ξₙ</div><div class="v" id="sf-sxi">–</div></div>
+      </div>
+      <div class="chain" id="sf-chain"></div>
+      <div class="two-even" style="margin-top:14px">
+        <div><p class="cap">street width vs log₁₀ C</p><svg class="plot" id="sf-pw" viewBox="0 0 320 170" aria-label="Margin width as a function of C"></svg></div>
+        <div><p class="cap">number of support vectors vs log₁₀ C</p><svg class="plot" id="sf-pn" viewBox="0 0 320 170" aria-label="Support vector count as a function of C"></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 17.83 – 17.92</h3>
+    <div class="mathcard">
+      <h4>The soft-margin primal</h4>
+      <div class="eq">\[ \min_{\mathbf w,w_0,\boldsymbol\xi}\ \tfrac12\lVert\mathbf w\rVert^2+C\sum_{n=1}^N\xi_n\quad\text{s.t.}\quad\xi_n\ge0,\quad\tilde y_n(\mathbf x_n^\top\mathbf w+w_0)\ge1-\xi_n \tag{17.83} \]</div>
+      <p>\(C=\infty\) makes any slack infinitely expensive and recovers 17.68.</p>
+
+      <h4>Lagrangian and the box constraint</h4>
+      <div class="eq">\[ L=\tfrac12\mathbf w^\top\mathbf w+C\sum_n\xi_n-\sum_n\alpha_n\big(\tilde y_n(\mathbf w^\top\mathbf x_n+w_0)-1+\xi_n\big)-\sum_n\mu_n\xi_n \tag{17.84} \]</div>
+      <ol class="steps">
+        <li><div>\(\nabla_{\mathbf w}L=0\) and \(\partial L/\partial w_0=0\) give the same results as before: \(\mathbf w=\sum\alpha_n\tilde y_n\mathbf x_n\), \(\sum\alpha_n\tilde y_n=0\).</div></li>
+        <li><div>The new one: \(\dfrac{\partial L}{\partial\xi_n}=C-\alpha_n-\mu_n=0\), so \(\alpha_n=C-\mu_n\). <span class="why">Since \(\mu_n\ge0\), \(\alpha_n\le C\). That is the only change.</span></div></li>
+        <li><div>Plug in. The \(\xi_n\) terms are \(\xi_n(C-\alpha_n-\mu_n)=0\), so they vanish:
+          \[ L(\boldsymbol\alpha)=\sum_{i=1}^N\alpha_i-\tfrac12\sum_{i=1}^N\sum_{j=1}^N\alpha_i\alpha_j\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j \tag{17.85} \]
+          \[ 0\le\alpha_n\le C\quad\text{(17.86)}\qquad \sum_{n=1}^N\alpha_n\tilde y_n=0 \tag{17.87} \]</div></li>
+      </ol>
+
+      <h4>Three kinds of points</h4>
+      <div class="scroll"><table class="vs">
+        <thead><tr><th></th><th>multiplier</th><th>slack</th><th>where it is</th></tr></thead>
+        <tbody>
+          <tr><th>ignored</th><td>\(\alpha_n=0\)</td><td>\(\xi_n=0\)</td><td>outside the street, correct side: \(\tilde y_nf_n\ge1\)</td></tr>
+          <tr><th>on margin</th><td>\(0\lt\alpha_n\lt C\)</td><td>\(\xi_n=0\)</td><td>exactly on a dashed line: \(\tilde y_nf_n=1\)</td></tr>
+          <tr><th>at bound</th><td>\(\alpha_n=C\)</td><td>\(\xi_n=1-\tilde y_nf_n\ge0\)</td><td>inside the street (\(\xi_n\le1\), still correct) or wrong side (\(\xi_n\gt1\))</td></tr>
+        </tbody>
+      </table></div>
+      <p>The middle row follows from \(\mu_n\xi_n=0\): if \(\alpha_n\lt C\) then \(\mu_n\gt0\), so \(\xi_n=0\). A misclassified point has \(\tilde y_nf_n\lt0\), so \(\xi_n\gt1\). Hence \(\sum_n\xi_n\ge\#\text{misclassified}\).</p>
+      <div class="eq">\[ \hat w_0=\frac1{|\mathcal M|}\sum_{n\in\mathcal M}\Big(\tilde y_n-\sum_{m\in\mathcal S}\alpha_m\tilde y_m\mathbf x_m^\top\mathbf x_n\Big),\qquad\mathcal M=\{n:0\lt\alpha_n\lt C\} \tag{17.88} \]</div>
+
+      <h4>The ν-SVM</h4>
+      <div class="eq">\[ \max_{\boldsymbol\alpha}\ -\tfrac12\sum_{i,j}\alpha_i\alpha_j\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j\quad\text{s.t.}\quad 0\le\alpha_n\le\tfrac1N,\quad\sum_n\alpha_n\tilde y_n=0,\quad\sum_n\alpha_n\ge\nu \tag{17.89–17.92} \]</div>
+      <p>Each \(\alpha_n\le1/N\), so to reach \(\sum\alpha_n\ge\nu\) at least \(\nu N\) of them must be nonzero: \(\nu\) is a lower bound on the fraction of support vectors. Margin errors (\(\xi_n\gt0\)) all sit at \(\alpha_n=1/N\), and at the optimum \(\sum\alpha_n=\nu\), so there are at most \(\nu N\) of them. Unlike \(C\), \(\nu\) is a number between 0 and 1 you can reason about directly.</p>
+      <div class="note">The book prints 17.92 with the sum running to \(M\). It should run over all \(N\) points. Also, 17.89 has no linear term: the "\(\sum\alpha_n\)" from 17.85 has moved into the constraint 17.92.</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Soft margins</h3><div class="quizbox" data-quiz="soft"></div></div>
+</section>
+
+<!-- ============ 17.3.4 Kernel trick ============ -->
+<section class="sec" id="kernel">
+  <div class="sec-head"><span class="secnum">§17.3.4</span><h2>The kernel trick: swap every dot product for a kernel</h2></div>
+  <div class="intro">
+    <p>In the dual, the data show up only as inner products \(\mathbf x_i^\top\mathbf x_j\): in the objective, in the prediction, and in the bias. Replace each one with a Mercer kernel \(K(\mathbf x_i,\mathbf x_j)\) and you are running a linear SVM in the kernel's feature space \(\boldsymbol\phi(\mathbf x)\) without ever computing \(\boldsymbol\phi\).</p>
+    <p>The prediction becomes \(f(\mathbf x)=\sum_{n\in\mathcal S}\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)+\hat w_0\) (Eq. 17.93). The boundary is a straight hyperplane in feature space and a curve in input space. The cost of one prediction is one kernel evaluation per support vector.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">If you can't split them with a straight line, lift them up first.</p>
+        <p>Put red marbles in a ring around a pile of blue marbles on a table. No straight ruler can separate them. Now lift every marble by how far it is from the center: the outside red marbles go up high, the blue ones in the middle stay low. A flat sheet of paper slid in between separates them perfectly.</p>
+        <p>The trick: the SVM never actually has to lift the marbles. It only needs to know "how similar are these two marbles?" That similarity score is the kernel from §17.1, and it secretly knows about the lifting.</p>
+      </div>
+      <div data-l="2">
+        <p>A curved boundary in 2-D can be a flat one in a higher-dimensional space. Take a point on a number line, \(x\), and turn it into two numbers \((x,x^2)\). Points far from 0 rise up a parabola and points near 0 stay low, so a slanted line in the new plane can separate "near 0" from "far from 0." The lift panel below does this.</p>
+        <p>The SVM's formulas only ever multiply points together: \(\mathbf x_i\cdot\mathbf x_j\). In the lifted space that product is \(x_ix_j+x_i^2x_j^2\), which you can compute straight from \(x_i\) and \(x_j\). A <b>kernel</b> is any formula like that. The RBF kernel corresponds to infinitely many lifted coordinates, and it still costs one exponential to compute.</p>
+      </div>
+      <div data-l="3">
+        <p>Kernelize each place a dot product appears. Objective: \(\sum_n\alpha_n-\tfrac12\sum_{ij}\alpha_i\alpha_j\tilde y_i\tilde y_jK(\mathbf x_i,\mathbf x_j)\). Prediction (17.93): \(f(\mathbf x)=\sum_{n\in\mathcal S}\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)+\hat w_0\). Bias (17.94): average \(\tilde y_i-\sum_j\alpha_j\tilde y_jK(\mathbf x_j,\mathbf x_i)\) over support vectors.</p>
+        <p>\(\hat{\mathbf w}=\sum\alpha_n\tilde y_n\boldsymbol\phi(\mathbf x_n)\) still exists in feature space, but you never form it. The dual stays a convex QP as long as \(K\) is PSD, because the matrix \(Q_{ij}=\tilde y_i\tilde y_jK_{ij}\) is then PSD.</p>
+        <p>This is 17.63 again: \(\alpha_i\) there is \(\alpha_i\tilde y_i\) here, and it is zero for non-support vectors. Kernels also work on strings and graphs (§17.1.2.4), where there's no \(\mathbf x\) to take a dot product of.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Representer theorem.</b> For any loss plus \(\lVert f\rVert^2_{\mathcal H_K}\), the minimizer has the form \(\sum_n\beta_nK(\cdot,\mathbf x_n)\). The SVM's hinge loss makes \(\boldsymbol\beta\) sparse; squared loss (kernel ridge, GP mean) doesn't.</li>
+          <li><b>Cost.</b> Training needs the Gram matrix: \(O(N^2)\) memory, \(O(N^2)\)–\(O(N^3)\) time. LIBSVM caches kernel rows and shrinks the active set. Past \(\sim10^5\) points, use random Fourier features or Nyström plus a linear SVM.</li>
+          <li><b>RBF hyperparameters.</b> sklearn writes \(e^{-\gamma\lVert\mathbf x-\mathbf x'\rVert^2}\), \(\gamma=1/2\ell^2\). Large \(\gamma\) (small \(\ell\)): every point is its own island and nearly all become SVs. Small \(\gamma\): close to linear.</li>
+          <li><b>Not probabilistic.</b> \(f(\mathbf x)\) is a score, not a log-odds (Fig. 17.15). Platt scaling fits \(\sigma(af+b)\) on held-out data. The RVM and GP classifiers model probabilities directly.</li>
+          <li><b>Indefinite kernels.</b> With a non-PSD "kernel" (e.g. sigmoid for some parameters), \(Q\) is indefinite, the dual is non-convex, and SMO finds a local stationary point.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Curved boundaries from straight-line math</h3>
+    <div class="panel">
+      <p class="hint">Pick a dataset and a kernel. Color shows \(f(\mathbf x)\) (red positive, blue negative), the solid curve is \(f=0\), and dashed curves are \(f=\pm1\). Click empty space to add a point of the chosen class, drag points to move them, and hover anywhere to see Eq. 17.93 term by term.</p>
+      <div class="btns" style="margin-top:0"><span class="lab">data:</span><div class="seg" id="kt-d"><button data-d="circles" class="on">Rings</button><button data-d="moons">Moons</button><button data-d="xor">XOR</button><button data-d="blobs">Blobs</button></div>
+        <span class="sep"></span><span class="lab">click adds:</span><div class="seg" id="kt-cls"><button data-c="1" class="on">ỹ = +1</button><button data-c="-1">ỹ = −1</button></div></div>
+      <div class="btns"><span class="lab">kernel:</span><div class="seg" id="kt-k"><button data-k="lin">Linear xᵀx′</button><button data-k="poly">Polynomial</button><button data-k="rbf" class="on">RBF</button></div></div>
+      <svg class="plot drag" id="kt-svg" viewBox="0 0 640 480" aria-label="Kernel SVM decision function"></svg>
+      <p class="hov" id="kt-hov">Hover over the plot.</p>
+      <div class="ctrl"><label for="kt-l">RBF length ℓ</label><input type="range" id="kt-l" min="0.15" max="3" step="0.05" value="0.8"><output id="kt-l-o">0.80</output></div>
+      <div class="ctrl"><label for="kt-deg">poly degree d</label><input type="range" id="kt-deg" min="1" max="6" step="1" value="2"><output id="kt-deg-o">2</output></div>
+      <div class="ctrl"><label for="kt-c">C (log scale)</label><input type="range" id="kt-c" min="-2" max="3" step="0.05" value="1"><output id="kt-c-o">10.0</output></div>
+      <div class="btns"><button class="b" id="kt-new">New sample</button><button class="b" id="kt-clear">Clear points</button></div>
+      <div class="readout">
+        <div class="stat"><div class="k">training points</div><div class="v" id="kt-n">–</div></div>
+        <div class="stat a"><div class="k">support vectors</div><div class="v" id="kt-nsv">–</div></div>
+        <div class="stat g"><div class="k">training accuracy</div><div class="v" id="kt-acc">–</div></div>
+        <div class="stat m"><div class="k">ŵ₀ (Eq. 17.94)</div><div class="v" id="kt-w0">–</div></div>
+      </div>
+      <div class="chain" id="kt-chain"></div>
+    </div>
+
+    <div class="panel">
+      <h4>Where the curve comes from: lift, cut flat, project back</h4>
+      <p class="hint">Six blue points sit between two groups of red ones on a line. No single threshold separates them. Slide the lift to map each \(x\) to \((x,x^2)\). Up there a linear SVM finds a straight line, and its two crossings with the parabola are the two thresholds back on the line. Click two points to check that \(\boldsymbol\phi(a)^\top\boldsymbol\phi(b)=K(a,b)\).</p>
+      <div class="ctrl"><label for="lf-t">lift</label><input type="range" id="lf-t" min="0" max="1" step="0.01" value="0"><output id="lf-t-o">0%</output></div>
+      <svg class="plot" id="lf-svg" viewBox="0 0 640 300" aria-label="One-dimensional points lifted onto a parabola"></svg>
+      <div class="chain" id="lf-chain"></div>
+    </div>
+
+    <div class="panel">
+      <h4>Aside: f(x) is a score, not a probability (Fig. 17.15)</h4>
+      <p class="hint">Two 1-D classes with known Gaussian densities, so the true log-odds \(\log p(\tilde y=1\mid x)-\log p(\tilde y=-1\mid x)\) is known (dashed). The RBF SVM's \(f(x)\) (purple) gets the sign right where there's data, but its size means nothing in particular. Away from the data it flattens to \(\hat w_0\). This previews §17.3.5 on turning SVM outputs into probabilities. Our data are synthetic, not the data behind the book's figure.</p>
+      <div class="ctrl"><label for="lo-l">RBF length ℓ</label><input type="range" id="lo-l" min="0.02" max="0.4" step="0.005" value="0.08"><output id="lo-l-o">0.080</output></div>
+      <div class="ctrl"><label for="lo-c">C (log scale)</label><input type="range" id="lo-c" min="-1" max="3" step="0.05" value="0"><output id="lo-c-o">1.00</output></div>
+      <svg class="plot" id="lo-svg" viewBox="0 0 640 300" aria-label="True log-odds compared with the SVM decision function"></svg>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 17.93 – 17.94</h3>
+    <div class="mathcard">
+      <h4>Kernelize the prediction</h4>
+      <div class="eq">\[ f(\mathbf x)=\hat{\mathbf w}^\top\mathbf x+\hat w_0=\sum_{n\in\mathcal S}\alpha_n\tilde y_n\mathbf x_n^\top\mathbf x+\hat w_0=\sum_{n\in\mathcal S}\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)+\hat w_0 \tag{17.93} \]</div>
+      <ol class="steps">
+        <li><div>Start in a feature space: replace \(\mathbf x\) everywhere by \(\boldsymbol\phi(\mathbf x)\). The dual (17.85) becomes \(\sum\alpha_n-\tfrac12\sum_{ij}\alpha_i\alpha_j\tilde y_i\tilde y_j\boldsymbol\phi(\mathbf x_i)^\top\boldsymbol\phi(\mathbf x_j)\).</div></li>
+        <li><div>By Mercer's theorem (§17.1.1), \(\boldsymbol\phi(\mathbf x_i)^\top\boldsymbol\phi(\mathbf x_j)=K(\mathbf x_i,\mathbf x_j)\). Every appearance of \(\boldsymbol\phi\) is inside such a product, so \(\boldsymbol\phi\) disappears. <span class="why">Training needs only the \(N\times N\) Gram matrix.</span></div></li>
+        <li><div>\(\hat{\mathbf w}=\sum_n\alpha_n\tilde y_n\boldsymbol\phi(\mathbf x_n)\) may be infinite-dimensional, but \(\hat{\mathbf w}^\top\boldsymbol\phi(\mathbf x)=\sum_n\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)\) is a finite sum. <span class="why">That's 17.93. Hover over the Play box to see it evaluated.</span></div></li>
+      </ol>
+
+      <h4>Kernelize the bias</h4>
+      <div class="eq">\[ \hat w_0=\frac1{|\mathcal S|}\sum_{i\in\mathcal S}\Big(\tilde y_i-\Big(\sum_{j\in\mathcal S}\hat\alpha_j\tilde y_j\mathbf x_j\Big)^\top\mathbf x_i\Big)=\frac1{|\mathcal S|}\sum_{i\in\mathcal S}\Big(\tilde y_i-\sum_{j\in\mathcal S}\hat\alpha_j\tilde y_jK(\mathbf x_j,\mathbf x_i)\Big) \tag{17.94} \]</div>
+      <p>For a soft margin, average over the on-margin set \(\mathcal M\) instead of \(\mathcal S\), as in 17.88. That's what the Play box does.</p>
+
+      <h4>The lift panel, written out</h4>
+      <p>With \(\boldsymbol\phi(x)=(x,x^2)\):</p>
+      <div class="eq">\[ K(a,b)=\boldsymbol\phi(a)^\top\boldsymbol\phi(b)=ab+a^2b^2,\qquad f(x)=\sum_n\alpha_n\tilde y_n(x_nx+x_n^2x^2)+\hat w_0=\hat w_1x+\hat w_2x^2+\hat w_0. \]</div>
+      <p>A line in the \((x,x^2)\) plane is a quadratic in \(x\), and its two roots are the two thresholds. For example \(a=2,b=3\): \(\boldsymbol\phi(a)^\top\boldsymbol\phi(b)=(2,4)\cdot(3,9)=6+36=42=2\cdot3+4\cdot9\).</p>
+
+      <h4>Why the RBF can carve out any shape</h4>
+      <p>With \(K(\mathbf x,\mathbf x')=\exp(-\lVert\mathbf x-\mathbf x'\rVert^2/2\ell^2)\), \(f\) is a sum of Gaussian bumps centered on the support vectors, positive bumps for red and negative for blue, plus \(\hat w_0\). Small \(\ell\) means narrow bumps and a boundary that hugs individual points. Far from all support vectors, \(f(\mathbf x)\to\hat w_0\).</p>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>The kernel trick</h3><div class="quizbox" data-quiz="kernel"></div></div>
+</section>
+
+<!-- ============ Cheat sheet ============ -->
+<section class="sec" id="cheat">
+  <div class="sec-head"><span class="secnum">—</span><h2>Cheat sheet</h2></div>
+  <div class="block">
+    <div class="panel scroll">
+      <table class="vs">
+        <thead><tr><th></th><th>In words</th><th>In symbols</th></tr></thead>
+        <tbody>
+          <tr><th>Model (17.63)</th><td>Weighted sum of kernels on training points; most weights are 0.</td><td>\(f(\mathbf x)=\sum_i\alpha_iK(\mathbf x,\mathbf x_i)\)</td></tr>
+          <tr><th>Classifier (17.64)</th><td>Sign of a linear score.</td><td>\(h(\mathbf x)=\operatorname{sign}(\mathbf w^\top\mathbf x+w_0)\)</td></tr>
+          <tr><th>Distance (17.65–66)</th><td>Score divided by the normal's length.</td><td>\(r=f(\mathbf x)/\lVert\mathbf w\rVert\)</td></tr>
+          <tr><th>Margin (17.67)</th><td>Distance of the closest point; maximize it.</td><td>\(\max\frac1{\lVert\mathbf w\rVert}\min_n\tilde y_nf_n\)</td></tr>
+          <tr><th>Hard primal (17.68)</th><td>Fix closest \(\tilde yf=1\); shortest \(\mathbf w\).</td><td>\(\min\tfrac12\lVert\mathbf w\rVert^2\) s.t. \(\tilde y_nf_n\ge1\)</td></tr>
+          <tr><th>Street width</th><td>Between \(f=-1\) and \(f=+1\).</td><td>\(2/\lVert\mathbf w\rVert\)</td></tr>
+          <tr><th>Stationarity (17.73–74)</th><td>\(\mathbf w\) is a signed sum of points; classes balance.</td><td>\(\hat{\mathbf w}=\sum\alpha_n\tilde y_n\mathbf x_n,\ \sum\alpha_n\tilde y_n=0\)</td></tr>
+          <tr><th>Dual (17.77)</th><td>Concave QP in \(N\) variables; data only via dot products.</td><td>\(\sum\alpha_n-\tfrac12\sum_{ij}\alpha_i\alpha_j\tilde y_i\tilde y_j\mathbf x_i^\top\mathbf x_j\)</td></tr>
+          <tr><th>KKT (17.78–80)</th><td>Either \(\alpha_n=0\) or the point is on the margin.</td><td>\(\alpha_n(\tilde y_nf_n-1)=0\)</td></tr>
+          <tr><th>Bias (17.82)</th><td>Average over support vectors.</td><td>\(\hat w_0=\frac1{|\mathcal S|}\sum_{\mathcal S}(\tilde y_n-\hat{\mathbf w}^\top\mathbf x_n)\)</td></tr>
+          <tr><th>Soft primal (17.83)</th><td>Slack \(\xi_n\) at price \(C\). Equivalent to hinge loss.</td><td>\(\min\tfrac12\lVert\mathbf w\rVert^2+C\sum\xi_n\)</td></tr>
+          <tr><th>Box (17.86)</th><td>Same dual, multipliers capped.</td><td>\(0\le\alpha_n\le C\)</td></tr>
+          <tr><th>Point types</th><td>\(\alpha=0\): outside. \(0\lt\alpha\lt C\): on margin. \(\alpha=C\): inside or wrong.</td><td>\(\xi_n=\max(0,1-\tilde y_nf_n)\)</td></tr>
+          <tr><th>Errors</th><td>Total slack bounds the training mistakes.</td><td>\(\sum\xi_n\ge\#\{\tilde y_nf_n\lt0\}\)</td></tr>
+          <tr><th>ν-SVM (17.89–92)</th><td>\(\nu\) ≥ fraction of margin errors, ≤ fraction of SVs.</td><td>\(0\le\alpha_n\le\tfrac1N,\ \sum\alpha_n\ge\nu\)</td></tr>
+          <tr><th>Kernel trick (17.93)</th><td>Replace \(\mathbf x^\top\mathbf x'\) with \(K(\mathbf x,\mathbf x')\).</td><td>\(f(\mathbf x)=\sum_{\mathcal S}\alpha_n\tilde y_nK(\mathbf x_n,\mathbf x)+\hat w_0\)</td></tr>
+          <tr><th>Kernel bias (17.94)</th><td>Same average, kernelized.</td><td>\(\frac1{|\mathcal S|}\sum_i(\tilde y_i-\sum_j\alpha_j\tilde y_jK_{ji})\)</td></tr>
+          <tr><th>Always</th><td>Standardize features. Tune \(C\) and \(\ell\) on a log grid.</td><td>\(\gamma=1/2\ell^2\) in sklearn's RBF</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <footer>Built as a study companion for Murphy, <i>Probabilistic Machine Learning: An Introduction</i> (MIT Press, CC-BY-NC-ND), §17.3–17.3.4. All data on this page are synthetic, generated in the page from fixed seeds (the four points in the scaling panel follow Géron's example). The SVMs are trained live in your browser with SMO. The log-odds panel previews §17.3.5.</footer>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function txt(parent, x, y, s, cls, extra) { const t = el('text', Object.assign({ x, y, class: cls || 'ax' }, extra || {}), parent); t.textContent = s; return t; }
+const lin = (d0, d1, r0, r1) => v => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const neg = s => String(s).replace(/^-/, '−');
+const f2 = v => neg((Math.abs(v) < 5e-3 ? 0 : v).toFixed(2)), f3 = v => neg((Math.abs(v) < 5e-4 ? 0 : v).toFixed(3));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pathOf = pts => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('');
+const svgPt = (svg, evt) => { const p = svg.createSVGPoint(); p.x = evt.clientX; p.y = evt.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+const normals = (seed, n) => { const r = rng(seed); return Array.from({ length: n }, () => gauss(r)); };
+const hexRgb = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+const renderers = [];
+const grid = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+
+function frame(o) {
+  const L = o.l, R = o.W - o.r, T = o.t, B = o.H - o.b;
+  return { L, R, T, B, X: lin(o.x[0], o.x[1], L, R), Y: lin(o.y[0], o.y[1], B, T), iX: lin(L, R, o.x[0], o.x[1]), iY: lin(B, T, o.y[0], o.y[1]) };
+}
+function axes(svg, f, o) {
+  (o.xt || []).forEach(v => { el('line', { x1: f.X(v), x2: f.X(v), y1: f.T, y2: f.B, class: 'gridl' }, svg); txt(svg, f.X(v), f.B + 15, (o.fx || fmtT)(v), 'ax', { 'text-anchor': 'middle' }); });
+  (o.yt || []).forEach(v => { el('line', { x1: f.L, x2: f.R, y1: f.Y(v), y2: f.Y(v), class: 'gridl' }, svg); txt(svg, f.L - 6, f.Y(v) + 4, (o.fy || fmtT)(v), 'ax', { 'text-anchor': 'end' }); });
+  el('line', { x1: f.L, x2: f.R, y1: f.B, y2: f.B, class: 'base' }, svg);
+  el('line', { x1: f.L, x2: f.L, y1: f.T, y2: f.B, class: 'base' }, svg);
+  if (o.xl) txt(svg, (f.L + f.R) / 2, f.B + 31, o.xl, 'axl', { 'text-anchor': 'middle' });
+  if (o.yl) txt(svg, f.L - 34, (f.T + f.B) / 2, o.yl, 'axl', { 'text-anchor': 'middle', transform: `rotate(-90 ${f.L - 34} ${(f.T + f.B) / 2})` });
+}
+function raster(svg, f, gw, gh, fill) {
+  const cv = document.createElement('canvas'); cv.width = gw; cv.height = gh;
+  const ctx = cv.getContext('2d'), im = ctx.createImageData(gw, gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const c = fill(i, gh - 1 - j), k = 4 * (j * gw + i);
+    if (!c) continue;
+    im.data[k] = c[0]; im.data[k + 1] = c[1]; im.data[k + 2] = c[2]; im.data[k + 3] = Math.round(255 * c[3]);
+  }
+  ctx.putImageData(im, 0, 0);
+  return el('image', { x: f.L, y: f.T, width: f.R - f.L, height: f.B - f.T, href: cv.toDataURL(), preserveAspectRatio: 'none' }, svg);
+}
+function cross(g, x, y, s) {
+  s = s || 7; const d = `M${x - s},${y - s}L${x + s},${y + s}M${x - s},${y + s}L${x + s},${y - s}`;
+  el('path', { d, stroke: 'var(--surface)', 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
+  el('path', { d, stroke: 'var(--ink)', 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+}
+function dot(g, x, y, r, fill) { el('circle', { cx: x, cy: y, r, fill, stroke: 'var(--surface)', 'stroke-width': 2 }, g); }
+function onDrag(svg, down, move, up) {
+  let active = false;
+  svg.addEventListener('pointerdown', e => { if (e.button > 0) return; const r = down(svgPt(svg, e), e); if (r === false) return; active = true; svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+  svg.addEventListener('pointermove', e => { if (active) move(svgPt(svg, e), e); });
+  const end = () => { if (active) { active = false; if (up) up(); } };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+}
+function slider(id, fmt, cb) {
+  const s = $('#' + id), o = $('#' + id + '-o');
+  const go = () => { o.textContent = fmt(+s.value); if (cb) cb(+s.value); };
+  s.addEventListener('input', go); o.textContent = fmt(+s.value);
+  return { get v() { return +s.value; }, set(v) { s.value = v; o.textContent = fmt(+s.value); } };
+}
+function segm(id, cb) {
+  const s = $('#' + id);
+  s.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $$('button', s).forEach(x => x.classList.toggle('on', x === b)); cb(b); });
+}
+function segSet(id, attr, val) { $$('#' + id + ' button').forEach(b => b.classList.toggle('on', b.dataset[attr] === val)); }
+function niceCeil(v) { const e = 10 ** Math.floor(Math.log10(v)); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * e >= v - 1e-12) return m * e; return 10 * e; }
+function ticksAB(a, b, n) {
+  const s = niceCeil((b - a) / (n || 4)), out = [];
+  for (let v = Math.ceil(a / s - 1e-9) * s; v <= b + 1e-9; v += s) out.push(+v.toFixed(6));
+  return out;
+}
+const fmtT = v => neg(String(+(+v).toFixed(3)));
+function clip(svg, f, id) {
+  const cp = el('clipPath', { id }, el('defs', {}, svg));
+  el('rect', { x: f.L, y: f.T, width: f.R - f.L, height: f.B - f.T }, cp);
+  return el('g', { 'clip-path': `url(#${id})` }, svg);
+}
+// diverging color: t in [-1, 1] → blue … surface … red
+function divColor(t) {
+  const s = hexRgb(cssv('--surface')), p = hexRgb(cssv('--c0')), n = hexRgb(cssv('--c1'));
+  const a = Math.min(1, Math.abs(t)), e = t >= 0 ? p : n;
+  return s.map((v, i) => Math.round(v + (e[i] - v) * a));
+}
+const rgbStr = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const fmtBig = v => v >= 1e15 ? v.toExponential(2) : Math.round(v).toLocaleString('en-US');
+
+const gramOf = (xs, k) => xs.map(a => xs.map(b => k(a, b)));
+
+/* ---------- SVM solver: SMO with second-order working-set selection (Fan, Chen & Lin 2005) ---------- */
+// dual in minimization form: ½αᵀQα − Σα, Q_ij = ỹ_i ỹ_j K_ij, 0 ≤ α ≤ C, Σ αỹ = 0; G = Qα − 1 is its gradient
+function svmFit(X, y, k, C, opt) {
+  opt = opt || {};
+  const N = X.length, K = gramOf(X, k), a = new Float64Array(N), G = new Float64Array(N).fill(-1);
+  const hist = opt.hist ? [{ a: Array.from(a), i: -1, j: -1 }] : null;
+  const maxIt = opt.maxIt || 20000, eps = opt.eps || 1e-5;
+  const up = t => (y[t] > 0 && a[t] < C) || (y[t] < 0 && a[t] > 0);
+  const low = t => (y[t] > 0 && a[t] > 0) || (y[t] < 0 && a[t] < C);
+  let it = 0;
+  for (; it < maxIt && N > 1; it++) {
+    let i = -1, gmax = -Infinity;
+    for (let t = 0; t < N; t++) if (up(t)) { const v = -y[t] * G[t]; if (v > gmax) { gmax = v; i = t; } }
+    let j = -1, gmin = Infinity, best = Infinity;
+    for (let t = 0; t < N; t++) if (low(t)) {
+      const v = -y[t] * G[t]; if (v < gmin) gmin = v;
+      const b = gmax - v;
+      if (i >= 0 && b > 0) { const q = Math.max(1e-12, K[i][i] + K[t][t] - 2 * K[i][t]); if (-b * b / q < best) { best = -b * b / q; j = t; } }
+    }
+    if (i < 0 || j < 0 || gmax - gmin < eps) break;
+    // move α_i by ỹ_i s and α_j by −ỹ_j s: keeps Σ αỹ fixed; optimal s = b / q, clipped to the box
+    const b = gmax + y[j] * G[j], q = Math.max(1e-12, K[i][i] + K[j][j] - 2 * K[i][j]);
+    const s = Math.min(b / q, y[i] > 0 ? C - a[i] : a[i], y[j] > 0 ? a[j] : C - a[j]);
+    const di = y[i] * s, dj = -y[j] * s;
+    a[i] += di; a[j] += dj;
+    for (let t = 0; t < N; t++) G[t] += y[t] * (y[i] * K[t][i] * di + y[j] * K[t][j] * dj);
+    if (hist) hist.push({ a: Array.from(a), i, j });
+  }
+  return svmModel(X, y, k, C, Array.from(a), K, { hist, iters: it });
+}
+// build predictor and bookkeeping from α; bias from the on-margin set (Eqs. 17.82 / 17.88 / 17.94)
+function svmModel(X, y, k, C, a, K, extra) {
+  const N = X.length, amax = Math.max(1e-12, ...a, 0), tol = 1e-7 * Math.max(1, Math.min(C, amax));
+  a = a.map(v => v < tol ? 0 : C - v < tol ? C : v);
+  const g = X.map((_, n) => { let s = 0; for (let m = 0; m < N; m++) if (a[m]) s += a[m] * y[m] * K[m][n]; return s; });
+  const sv = a.map((v, n) => v > 0 ? n : -1).filter(n => n >= 0);
+  const free = sv.filter(n => a[n] < C);
+  let w0;
+  if (free.length) w0 = free.reduce((s, n) => s + y[n] - g[n], 0) / free.length;
+  else if (sv.length) {
+    // no point strictly inside the box: take the midpoint of the feasible interval for w0
+    let lo = -Infinity, hi = Infinity;
+    for (let n = 0; n < N; n++) {
+      const r = y[n] - g[n];
+      if (a[n] === 0) { if (y[n] > 0) lo = Math.max(lo, r); else hi = Math.min(hi, r); }
+      else { if (y[n] > 0) hi = Math.min(hi, r); else lo = Math.max(lo, r); }
+    }
+    w0 = isFinite(lo) && isFinite(hi) ? (lo + hi) / 2 : isFinite(lo) ? lo : isFinite(hi) ? hi : 0;
+  } else w0 = 0;
+  const fs = g.map(v => v + w0);
+  const f = x => { let s = w0; for (const n of sv) s += a[n] * y[n] * k(X[n], x); return s; };
+  let dual = 0; for (let n = 0; n < N; n++) dual += a[n] - .5 * a[n] * y[n] * g[n];
+  return Object.assign({ X, y, k, C, a, K, sv, free, w0, fs, f, dual }, extra || {});
+}
+// linear kernel only: ŵ = Σ αₙ ỹₙ xₙ (Eq. 17.73)
+const wOf = m => m.X.reduce((w, x, n) => [w[0] + m.a[n] * m.y[n] * x[0], w[1] + m.a[n] * m.y[n] * x[1]], [0, 0]);
+const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
+const KL = { lin: dot2 };
+// does a hard-margin fit (huge C) actually satisfy every constraint?
+const separable = m => m.fs.every((v, n) => m.y[n] * v >= 1 - 1e-3);
+
+/* ---------- 2-D plane drawing ---------- */
+const PX = [-4, 4], PY = [-3, 3];
+const planeFrame = () => frame({ W: 640, H: 480, l: 20, r: 20, t: 15, b: 15, x: PX, y: PY });
+function planeAxes(svg, f) {
+  for (let v = -4; v <= 4; v++) el('line', { x1: f.X(v), x2: f.X(v), y1: f.T, y2: f.B, class: 'gridl', opacity: v ? .55 : 1 }, svg);
+  for (let v = -3; v <= 3; v++) el('line', { x1: f.L, x2: f.R, y1: f.Y(v), y2: f.Y(v), class: 'gridl', opacity: v ? .55 : 1 }, svg);
+  el('rect', { x: f.L, y: f.T, width: f.R - f.L, height: f.B - f.T, fill: 'none', stroke: 'var(--rule)' }, svg);
+  txt(svg, f.R - 6, f.Y(0) - 6, 'x₁', 'ax', { 'text-anchor': 'end' });
+  txt(svg, f.X(0) + 6, f.T + 14, 'x₂', 'ax');
+}
+// the segment of {x : wᵀx + w0 = c} inside the box xr × yr
+function lineIn(w, w0, c, xr, yr) {
+  const n2 = dot2(w, w); if (n2 < 1e-18) return null;
+  const p = [w[0] * (c - w0) / n2, w[1] * (c - w0) / n2], d = [-w[1], w[0]];
+  let t0 = -Infinity, t1 = Infinity;
+  for (const [k, lo, hi] of [[0, xr[0], xr[1]], [1, yr[0], yr[1]]]) {
+    if (Math.abs(d[k]) < 1e-12) { if (p[k] < lo || p[k] > hi) return null; continue; }
+    let u = (lo - p[k]) / d[k], v = (hi - p[k]) / d[k]; if (u > v) [u, v] = [v, u];
+    t0 = Math.max(t0, u); t1 = Math.min(t1, v);
+  }
+  return t0 < t1 ? [[p[0] + t0 * d[0], p[1] + t0 * d[1]], [p[0] + t1 * d[0], p[1] + t1 * d[1]]] : null;
+}
+function drawLine(g, f, w, w0, c, attrs, xr, yr) {
+  const s = lineIn(w, w0, c, xr || PX, yr || PY); if (!s) return;
+  el('line', Object.assign({ x1: f.X(s[0][0]), y1: f.Y(s[0][1]), x2: f.X(s[1][0]), y2: f.Y(s[1][1]) }, attrs), g);
+}
+function drawStreet(g, f, w, w0, opt) {
+  opt = opt || {};
+  const n = Math.hypot(w[0], w[1]); if (n < 1e-12) return;
+  const m = opt.m || 1, a = lineIn(w, w0, m, PX, PY), b = lineIn(w, w0, -m, PX, PY);
+  if (opt.fill !== false) {
+    // the band between f = −m and f = +m, clipped by the frame's clip path
+    const u = [w[0] / n, w[1] / n], t = [-u[1], u[0]], p = [-w0 * u[0] / n, -w0 * u[1] / n], h = m / n, L = 20;
+    const c = [[p[0] + u[0] * h - t[0] * L, p[1] + u[1] * h - t[1] * L], [p[0] + u[0] * h + t[0] * L, p[1] + u[1] * h + t[1] * L], [p[0] - u[0] * h + t[0] * L, p[1] - u[1] * h + t[1] * L], [p[0] - u[0] * h - t[0] * L, p[1] - u[1] * h - t[1] * L]];
+    el('path', { d: pathOf(c.map(q => [f.X(q[0]), f.Y(q[1])])) + 'Z', fill: opt.band || 'var(--mi-soft)' }, g);
+  }
+  const dash = { stroke: opt.col || 'var(--ink)', 'stroke-width': 1.6, 'stroke-dasharray': '7 5', opacity: opt.op || 1 };
+  if (a) el('line', Object.assign({ x1: f.X(a[0][0]), y1: f.Y(a[0][1]), x2: f.X(a[1][0]), y2: f.Y(a[1][1]) }, dash), g);
+  if (b) el('line', Object.assign({ x1: f.X(b[0][0]), y1: f.Y(b[0][1]), x2: f.X(b[1][0]), y2: f.Y(b[1][1]) }, dash), g);
+  drawLine(g, f, w, w0, 0, { stroke: opt.col || 'var(--ink)', 'stroke-width': 2.6, opacity: opt.op || 1 });
+}
+// a data point: circle for ỹ = +1, square for ỹ = −1
+function pt(g, x, y, cls, r) {
+  r = r || 6.5;
+  if (cls > 0) return el('circle', { cx: x, cy: y, r, fill: 'var(--c0)', stroke: 'var(--surface)', 'stroke-width': 2, class: 'handle' }, g);
+  return el('rect', { x: x - r + .5, y: y - r + .5, width: 2 * r - 1, height: 2 * r - 1, rx: 1.5, fill: 'var(--c1)', stroke: 'var(--surface)', 'stroke-width': 2, class: 'handle' }, g);
+}
+function ring(g, x, y, kind) {
+  if (kind === 'free') el('circle', { cx: x, cy: y, r: 11.5, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.8 }, g);
+  else if (kind === 'bound') el('circle', { cx: x, cy: y, r: 11.5, fill: 'none', stroke: 'var(--gap)', 'stroke-width': 2, 'stroke-dasharray': '4 3' }, g);
+  else if (kind === 'pick') el('circle', { cx: x, cy: y, r: 15, fill: 'none', stroke: 'var(--mi)', 'stroke-width': 2.4 }, g);
+}
+// generic point dragging on a plane: returns index under pointer, or −1
+function nearest(P, f, p, rad) {
+  let best = -1, bd = rad || 14;
+  P.forEach((q, i) => { const d = Math.hypot(f.X(q[0]) - p.x, f.Y(q[1]) - p.y); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function dragPoints(svg, getF, st, after, opts) {
+  opts = opts || {};
+  let drag = -1, moved = false;
+  onDrag(svg, p => {
+    const f = getF(); drag = nearest(st.P, f, p);
+    moved = false;
+    if (drag < 0) { if (opts.empty) opts.empty(p, f); return false; }
+    if (opts.pick) opts.pick(drag);
+  }, p => {
+    const f = getF(); moved = true;
+    st.P[drag] = [clamp(f.iX(p.x), PX[0] + .05, PX[1] - .05), clamp(f.iY(p.y), PY[0] + .05, PY[1] - .05)];
+    after(true);
+  }, () => { drag = -1; if (moved) after(false); });
+}
+const rnd2 = v => Math.round(v * 100) / 100;
+
+/* =====================================================================
+   17.3.1  Large margin: your line vs the max-margin line (Eqs. 17.64–17.68)
+   ===================================================================== */
+(function () {
+  const svg = $('#mg-svg');
+  const START = [[1.2, 1.4, 1], [2.1, 0.5, 1], [2.6, 2.0, 1], [1.4, 2.5, 1], [3.1, 1.0, 1], [0.3, 2.3, 1],
+    [-1.4, -0.8, -1], [-2.2, 0.4, -1], [-0.5, -1.8, -1], [-2.6, -1.6, -1], [-1.1, 0.9, -1], [-3.0, -0.3, -1]];
+  const st = { P: START.map(p => [p[0], p[1]]), Y: START.map(p => p[2]), th: 20, s: .4, k: 1, sel: 0, best: false };
+  let f = planeFrame(), opt = null;
+  const th = slider('mg-th', v => String(v), v => { st.th = v; render(); });
+  const so = slider('mg-s', v => f2(v), v => { st.s = v; render(); });
+  const ko = slider('mg-k', v => f2(v), v => { st.k = v; render(); });
+
+  function solve() { opt = svmFit(st.P, st.Y, KL.lin, 1e6); opt.w = wOf(opt); opt.ok = separable(opt); }
+  function render(fast) {
+    if (!fast || !opt) solve();
+    svg.innerHTML = ''; f = planeFrame(); planeAxes(svg, f);
+    const g = clip(svg, f, 'mg-clip');
+    const u = [Math.cos(st.th * Math.PI / 180), Math.sin(st.th * Math.PI / 180)];
+    const w = [st.k * u[0], st.k * u[1]], w0 = st.k * st.s;
+    const r = st.P.map(p => dot2(u, p) + st.s), yr = r.map((v, n) => st.Y[n] * v);
+    const mn = Math.min(...yr), close = yr.indexOf(mn);
+    if (st.best && opt.ok) drawStreet(g, f, opt.w, opt.w0, { col: 'var(--green)', op: .8, fill: false });
+    // your street: out to the closest point on each side
+    if (mn > 0) drawStreet(g, f, u, st.s, { m: mn });
+    else drawLine(g, f, u, st.s, 0, { stroke: 'var(--ink)', 'stroke-width': 2.6 });
+    // normal arrow + geometry of the selected point (Fig. 17.13a)
+    const q = st.P[st.sel], rs = r[st.sel], xp = [q[0] - rs * u[0], q[1] - rs * u[1]];
+    el('line', { x1: f.X(q[0]), y1: f.Y(q[1]), x2: f.X(xp[0]), y2: f.Y(xp[1]), stroke: 'var(--gap)', 'stroke-width': 2.2, 'stroke-dasharray': '5 3' }, g);
+    const sq = 8 / 75, tv = [-u[1], u[0]], sgn = rs >= 0 ? 1 : -1;
+    el('path', { d: pathOf([[xp[0] + sgn * u[0] * sq, xp[1] + sgn * u[1] * sq], [xp[0] + sgn * u[0] * sq + tv[0] * sq, xp[1] + sgn * u[1] * sq + tv[1] * sq], [xp[0] + tv[0] * sq, xp[1] + tv[1] * sq]].map(p => [f.X(p[0]), f.Y(p[1])])), fill: 'none', stroke: 'var(--gap)', 'stroke-width': 1.4 }, g);
+    const ax = [xp[0] + u[0] * .9, xp[1] + u[1] * .9];
+    el('line', { x1: f.X(xp[0]), y1: f.Y(xp[1]), x2: f.X(ax[0]), y2: f.Y(ax[1]), stroke: 'var(--mi)', 'stroke-width': 2.6 }, g);
+    const hd = [[ax[0] - u[0] * .18 + tv[0] * .09, ax[1] - u[1] * .18 + tv[1] * .09], ax, [ax[0] - u[0] * .18 - tv[0] * .09, ax[1] - u[1] * .18 - tv[1] * .09]];
+    el('path', { d: pathOf(hd.map(p => [f.X(p[0]), f.Y(p[1])])) + 'Z', fill: 'var(--mi)' }, g);
+    txt(g, f.X(ax[0] + u[0] * .22), f.Y(ax[1] + u[1] * .22) + 4, 'w', 'lbl', { fill: 'var(--mi)', 'text-anchor': 'middle' });
+    el('circle', { cx: f.X(xp[0]), cy: f.Y(xp[1]), r: 4, fill: 'var(--gap)' }, g);
+    txt(g, f.X(xp[0]) + 8, f.Y(xp[1]) + 16, 'x⊥', 'lbl', { fill: 'var(--gap)' });
+    txt(g, f.X((q[0] + xp[0]) / 2) + 8, f.Y((q[1] + xp[1]) / 2) - 6, 'r = ' + f2(rs), 'lbl', { fill: 'var(--gap)' });
+    st.P.forEach((p, n) => {
+      pt(svg, f.X(p[0]), f.Y(p[1]), st.Y[n]);
+      if (n === close && mn > 0) ring(svg, f.X(p[0]), f.Y(p[1]), 'free');
+      if (n === st.sel) ring(svg, f.X(p[0]), f.Y(p[1]), 'pick');
+      if (yr[n] < 0) txt(svg, f.X(p[0]) + 10, f.Y(p[1]) - 9, 'wrong side', 'ax', { fill: 'var(--red)' });
+    });
+
+    const best = opt.ok ? 1 / Math.hypot(...opt.w) : NaN;
+    $('#mg-m').textContent = f3(mn); $('#mg-m').style.color = mn < 0 ? 'var(--red)' : '';
+    $('#mg-best-v').textContent = opt.ok ? f3(best) : '–';
+    $('#mg-yf').textContent = f3(st.k * mn);
+    const v = $('#mg-verdict');
+    if (!opt.ok) { v.textContent = 'These points can\'t be split by a line, so no margin is possible. §17.3.3 fixes that.'; v.className = 'verdict bad'; }
+    else if (mn <= 0) { v.textContent = 'A point is on the wrong side: this line doesn\'t separate the classes.'; v.className = 'verdict bad'; }
+    else { const pc = 100 * mn / best; v.textContent = pc > 99.5 ? 'This is the max-margin line.' : `Your margin is ${pc.toFixed(0)}% of the best possible.`; v.className = 'verdict ' + (pc > 99.5 ? 'ok' : pc > 80 ? 'meh' : 'bad'); }
+    const fx = st.k * rs;
+    $('#mg-chain').innerHTML = `selected point ${st.Y[st.sel] > 0 ? '(ỹ = +1)' : '(ỹ = −1)'}: f(x) = wᵀx + w₀ = <span class="m">${f3(fx)}</span>, ‖w‖ = ${f2(st.k)}, r = f(x)/‖w‖ = <span class="a">${f3(rs)}</span><br>` +
+      `closest point: ỹf = ${f3(st.k * mn)}, margin = min ỹf / ‖w‖ = <span class="m">${f3(mn)}</span>. <span class="mu">Change "scale ‖w‖": f and ỹf change, r and the margin don't.</span>` +
+      (opt.ok ? `<br>max-margin solution: ŵ = (${f3(opt.w[0])}, ${f3(opt.w[1])}), ŵ₀ = ${f3(opt.w0)}, ‖ŵ‖²/2 = ${f3(dot2(opt.w, opt.w) / 2)}, ${opt.sv.length} support vectors.` : '');
+  }
+  dragPoints(svg, () => f, st, fast => render(false), { pick: i => { st.sel = i; render(true); } });
+  $('#mg-snap').addEventListener('click', () => {
+    if (!opt.ok) return;
+    const n = Math.hypot(...opt.w);
+    st.th = Math.round(((Math.atan2(opt.w[1], opt.w[0]) * 180 / Math.PI) + 360) % 360 * 100) / 100; st.s = opt.w0 / n; st.k = clamp(n, .2, 3);
+    // the θ slider rounds to whole degrees; st.th keeps the exact angle
+    th.set(st.th); so.set(st.s); ko.set(st.k);
+    render(true);
+  });
+  $('#mg-canon').addEventListener('click', () => {
+    const u = [Math.cos(st.th * Math.PI / 180), Math.sin(st.th * Math.PI / 180)];
+    const mn = Math.min(...st.P.map((p, n) => st.Y[n] * (dot2(u, p) + st.s)));
+    if (mn > 0) { st.k = clamp(1 / mn, .2, 3); ko.set(st.k); render(true); }
+  });
+  $('#mg-reset').addEventListener('click', () => { st.P = START.map(p => [p[0], p[1]]); render(); });
+  $('#mg-best').addEventListener('change', e => { st.best = e.target.checked; render(true); });
+  render(); renderers.push(render);
+})();
+
+/* ---------- Feature scaling (Fig. 17.14) ---------- */
+(function () {
+  const BASE = [[1, 2.5, -1], [5, 1, -1], [3, 4, 1], [5, 3, 1]];
+  let m = 20;
+  slider('fs-m', v => '×' + v, v => { m = v; render(); });
+  function panel(svg, P, Y, xr, yr, xl, yl, fits) {
+    svg.innerHTML = '';
+    const f = frame({ W: 320, H: 260, l: 42, r: 10, t: 10, b: 38, x: xr, y: yr });
+    axes(svg, f, { xt: ticksAB(xr[0], xr[1], 4), yt: ticksAB(yr[0], yr[1], 4), xl, yl });
+    const g = clip(svg, f, svg.id + '-clip');
+    fits.forEach(F => {
+      const n = Math.hypot(...F.w); if (n < 1e-12) return;
+      for (const c of [-1, 1]) drawLine(g, f, F.w, F.w0, c, { stroke: F.col, 'stroke-width': 1.4, 'stroke-dasharray': '6 4', opacity: .9 }, xr, yr);
+      drawLine(g, f, F.w, F.w0, 0, { stroke: F.col, 'stroke-width': 2.4, 'stroke-dasharray': F.dash || null }, xr, yr);
+      if (F.sv) F.sv.forEach(i => ring(svg, f.X(P[i][0]), f.Y(P[i][1]), 'free'));
+    });
+    P.forEach((p, i) => pt(svg, f.X(p[0]), f.Y(p[1]), Y[i], 6));
+  }
+  function render() {
+    const P = BASE.map(p => [p[0], p[1] * m]), Y = BASE.map(p => p[2]);
+    const mu = [0, 1].map(d => P.reduce((s, p) => s + p[d], 0) / P.length);
+    const sd = [0, 1].map(d => Math.sqrt(P.reduce((s, p) => s + (p[d] - mu[d]) ** 2, 0) / P.length));
+    const Z = P.map(p => [(p[0] - mu[0]) / sd[0], (p[1] - mu[1]) / sd[1]]);
+    const raw = svmFit(P, Y, KL.lin, 1e6), std = svmFit(Z, Y, KL.lin, 1e6);
+    const wr = wOf(raw), ws = wOf(std);
+    // carry the raw boundary into standardized coordinates: x = μ + σ ⊙ z
+    const wz = [wr[0] * sd[0], wr[1] * sd[1]], w0z = dot2(wr, mu) + raw.w0;
+    panel($('#fs-raw'), P, Y, [0, 6], [0, 5 * m], 'x₀', 'x₁', [{ w: wr, w0: raw.w0, col: 'var(--red)', sv: raw.sv }]);
+    panel($('#fs-std'), Z, Y, [-2, 2], [-2, 2], 'x₀ (scaled)', 'x₁ (scaled)', [{ w: wz, w0: w0z, col: 'var(--red)', dash: '7 5' }, { w: ws, w0: std.w0, col: 'var(--green)', sv: std.sv }]);
+    const marg = (w, w0) => Math.min(...Z.map((z, i) => Y[i] * (dot2(w, z) + w0))) / Math.hypot(...w);
+    $('#fs-mr').textContent = f3(marg(wz, w0z));
+    $('#fs-ms').textContent = f3(marg(ws, std.w0));
+    $('#fs-sv').textContent = raw.sv.length + ' / ' + std.sv.length;
+  }
+  render(); renderers.push(render);
+})();
+
+/* =====================================================================
+   17.3.2  Dual problem: SMO step by step (Eqs. 17.69–17.82)
+   ===================================================================== */
+(function () {
+  const svg = $('#du-svg');
+  const START = [[1.0, 1.5, 1], [2.0, 0.4, 1], [2.5, 2.1, 1], [0.6, 2.6, 1], [-1.0, -0.4, -1], [-2.1, 0.5, -1], [-0.5, -1.8, -1], [-2.3, -1.6, -1]];
+  const st = { P: START.map(p => [p[0], p[1]]), Y: START.map(p => p[2]), step: 0 };
+  let f = planeFrame(), M = null;
+  function solve() { M = svmFit(st.P, st.Y, KL.lin, 1e6, { hist: true }); M.w = wOf(M); M.ok = separable(M); st.step = M.hist.length - 1; }
+  function render(fast) {
+    if (!fast || !M) solve();
+    const H = M.hist, h = H[st.step], N = st.P.length;
+    const a = h.a, w = st.P.reduce((s, x, n) => [s[0] + a[n] * st.Y[n] * x[0], s[1] + a[n] * st.Y[n] * x[1]], [0, 0]);
+    const S = a.map((v, n) => v > 1e-9 ? n : -1).filter(n => n >= 0);
+    const w0 = S.length ? S.reduce((s, n) => s + st.Y[n] - dot2(w, st.P[n]), 0) / S.length : 0;
+    const fx = st.P.map(x => dot2(w, x) + w0);
+    let L = 0; a.forEach(v => L += v); L -= dot2(w, w) / 2;
+
+    svg.innerHTML = ''; f = planeFrame(); planeAxes(svg, f);
+    const g = clip(svg, f, 'du-clip');
+    if (S.length && M.ok) drawStreet(g, f, w, w0);
+    st.P.forEach((p, n) => {
+      pt(svg, f.X(p[0]), f.Y(p[1]), st.Y[n]);
+      if (a[n] > 1e-9) ring(svg, f.X(p[0]), f.Y(p[1]), 'free');
+      if (n === h.i || n === h.j) ring(svg, f.X(p[0]), f.Y(p[1]), 'pick');
+      txt(svg, f.X(p[0]) + 11, f.Y(p[1]) + 18, String(n + 1), 'ax', { fill: 'var(--ink)' });
+    });
+
+    // α bars
+    const sa = $('#du-alpha'); sa.innerHTML = '';
+    const amax = Math.max(.1, ...H[H.length - 1].a, ...a);
+    const fa = frame({ W: 320, H: 170, l: 38, r: 6, t: 8, b: 22, x: [0, N], y: [0, amax * 1.1] });
+    ticksAB(0, amax * 1.1, 3).forEach(v => { el('line', { x1: fa.L, x2: fa.R, y1: fa.Y(v), y2: fa.Y(v), class: 'gridl' }, sa); txt(sa, fa.L - 5, fa.Y(v) + 4, fmtT(v), 'ax', { 'text-anchor': 'end' }); });
+    el('line', { x1: fa.L, x2: fa.R, y1: fa.B, y2: fa.B, class: 'base' }, sa);
+    const bw = (fa.R - fa.L) / N;
+    a.forEach((v, n) => {
+      el('rect', { x: fa.L + n * bw + bw * .18, y: fa.Y(v), width: bw * .64, height: Math.max(0, fa.B - fa.Y(v)), fill: st.Y[n] > 0 ? 'var(--c0)' : 'var(--c1)', rx: 2 }, sa);
+      if (n === h.i || n === h.j) el('rect', { x: fa.L + n * bw + bw * .1, y: fa.T, width: bw * .8, height: fa.B - fa.T, fill: 'none', stroke: 'var(--mi)', 'stroke-width': 1.5, rx: 3 }, sa);
+      txt(sa, fa.L + (n + .5) * bw, fa.B + 15, String(n + 1), 'ax', { 'text-anchor': 'middle' });
+    });
+
+    // objective by step
+    const so = $('#du-obj'); so.innerHTML = '';
+    const Ls = H.map(s => { const ww = st.P.reduce((q, x, n) => [q[0] + s.a[n] * st.Y[n] * x[0], q[1] + s.a[n] * st.Y[n] * x[1]], [0, 0]); return s.a.reduce((q, v) => q + v, 0) - dot2(ww, ww) / 2; });
+    const P = dot2(M.w, M.w) / 2, top = Math.max(P, ...Ls) * 1.12 || 1;
+    const fo = frame({ W: 320, H: 150, l: 38, r: 8, t: 8, b: 26, x: [0, Math.max(1, H.length - 1)], y: [0, top] });
+    axes(so, fo, { xt: ticksAB(0, Math.max(1, H.length - 1), 4), yt: ticksAB(0, top, 3) });
+    if (M.ok) el('line', { x1: fo.L, x2: fo.R, y1: fo.Y(P), y2: fo.Y(P), stroke: 'var(--green)', 'stroke-dasharray': '6 4', 'stroke-width': 1.6 }, so);
+    el('path', { d: pathOf(Ls.map((v, i) => [fo.X(i), fo.Y(clamp(v, 0, top))])), fill: 'none', stroke: 'var(--mi)', 'stroke-width': 2.2 }, so);
+    el('circle', { cx: fo.X(st.step), cy: fo.Y(clamp(L, 0, top)), r: 4.5, fill: 'var(--mi)' }, so);
+
+    $('#du-it').textContent = `step ${st.step} / ${H.length - 1}`;
+    $('#du-L').textContent = f3(L);
+    $('#du-P').textContent = M.ok ? f3(P) : '–';
+    $('#du-sum').textContent = f3(a.reduce((s, v, n) => s + v * st.Y[n], 0));
+    $('#du-nsv').textContent = S.length;
+    const vd = $('#du-verdict');
+    if (!M.ok) { vd.textContent = 'Not linearly separable: the hard-margin problem has no solution, and α grows without limit. Move a point back, or see §17.3.3.'; vd.className = 'verdict bad'; }
+    else if (st.step === H.length - 1) { vd.textContent = `Converged. Dual = primal = ${f3(P)}, and Σαₙ = ${f3(a.reduce((s, v) => s + v, 0))} = ‖ŵ‖².`; vd.className = 'verdict ok'; }
+    else { vd.textContent = st.step ? `Pair (${h.i + 1}, ${h.j + 1}) just moved. Duality gap: ${f3(P - L)}.` : 'All α = 0: no line yet. Press Step.'; vd.className = 'verdict meh'; }
+    $('#du-chain').innerHTML = S.length ? `ŵ = Σ αₙỹₙxₙ = ${S.map(n => `<span class="${st.Y[n] > 0 ? 'bad' : 'm'}">${f3(a[n])}·(${st.Y[n] > 0 ? '+' : '−'}1)·x${'₁₂₃₄₅₆₇₈₉'[n] || n + 1}</span>`).join(' + ')} = (${f3(w[0])}, ${f3(w[1])})<br>` +
+      `ŵ₀ = mean over S of (ỹₙ − ŵᵀxₙ) = ${S.map(n => f3(st.Y[n] - dot2(w, st.P[n]))).join(', ')} → <span class="m">${f3(w0)}</span>` +
+      `<br><span class="mu">Prediction needs ${S.length} of ${N} points (Eq. 17.81). Non-support vectors could be deleted without changing anything.</span>` : 'α = 0, so ŵ = 0 and there is no boundary yet.';
+    $('#du-kkt').innerHTML = `<tr><th>n</th><th>ỹ</th><th>α</th><th>ỹf(x) − 1</th><th>α(ỹf − 1)</th></tr>` + st.P.map((_, n) => {
+      const sl = st.Y[n] * fx[n] - 1, pr = a[n] * sl;
+      return `<tr class="${a[n] > 1e-9 ? 'on' : ''}"><td>${n + 1}</td><td>${st.Y[n] > 0 ? '+1' : '−1'}</td><td>${f3(a[n])}</td><td style="${sl < -1e-3 ? 'color:var(--red)' : ''}">${f3(sl)}</td><td>${f3(pr)}</td></tr>`;
+    }).join('');
+  }
+  dragPoints(svg, () => f, st, () => render());
+  $('#du-zero').addEventListener('click', () => { st.step = 0; render(true); });
+  $('#du-step').addEventListener('click', () => { st.step = Math.min(M.hist.length - 1, st.step + 1); render(true); });
+  $('#du-run').addEventListener('click', () => { st.step = M.hist.length - 1; render(true); });
+  $('#du-reset').addEventListener('click', () => { st.P = START.map(p => [p[0], p[1]]); render(); });
+  render(); st.step = 0; render(true); renderers.push(() => render(true));
+})();
+
+/* =====================================================================
+   17.3.3  Soft margin: C, slack and the three kinds of points (Eqs. 17.83–17.92)
+   ===================================================================== */
+(function () {
+  const svg = $('#sf-svg');
+  const st = { P: [], Y: [], logC: 0, sep: 2.2, seed: 7, xi: true, lab: false };
+  let f = planeFrame(), M = null, path = null;
+  function makeData() {
+    const r = rng(st.seed), n = 14, u = [Math.cos(.5), Math.sin(.5)];
+    st.P = []; st.Y = [];
+    for (let i = 0; i < 2 * n; i++) {
+      const c = i < n ? 1 : -1, z1 = gauss(r) * .85, z2 = gauss(r) * .85;
+      st.P.push([clamp(c * u[0] * st.sep / 2 + z1, -3.9, 3.9), clamp(c * u[1] * st.sep / 2 + z2, -2.9, 2.9)]); st.Y.push(c);
+    }
+  }
+  function regPath() {
+    const out = [];
+    for (let lc = -2; lc <= 3.001; lc += .125) { const m = svmFit(st.P, st.Y, KL.lin, 10 ** lc); out.push({ lc, w: 2 / Math.max(1e-9, Math.hypot(...wOf(m))), n: m.sv.length }); }
+    return out;
+  }
+  function small(svg, key, col, yl) {
+    svg.innerHTML = '';
+    let top = Math.max(...path.map(p => p[key])); if (key === 'w') top = Math.min(top, 12);
+    top = niceCeil(top * 1.05);
+    const fp = frame({ W: 320, H: 170, l: 38, r: 8, t: 8, b: 30, x: [-2, 3], y: [0, top] });
+    axes(svg, fp, { xt: [-2, -1, 0, 1, 2, 3], yt: ticksAB(0, top, 3), xl: 'log₁₀ C' });
+    el('path', { d: pathOf(path.map(p => [fp.X(p.lc), fp.Y(Math.min(p[key], top))])), fill: 'none', stroke: col, 'stroke-width': 2.2 }, svg);
+    const cur = key === 'w' ? 2 / Math.hypot(...M.w) : M.sv.length;
+    el('line', { x1: fp.X(st.logC), x2: fp.X(st.logC), y1: fp.T, y2: fp.B, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: .6 }, svg);
+    el('circle', { cx: fp.X(st.logC), cy: fp.Y(Math.min(cur, top)), r: 4.5, fill: col, stroke: 'var(--surface)', 'stroke-width': 1.5 }, svg);
+  }
+  function render(keepPath) {
+    const C = 10 ** st.logC;
+    M = svmFit(st.P, st.Y, KL.lin, C); M.w = wOf(M);
+    if (!keepPath || !path) path = regPath();
+    svg.innerHTML = ''; f = planeFrame(); planeAxes(svg, f);
+    const g = clip(svg, f, 'sf-clip');
+    const n = Math.hypot(...M.w), u = [M.w[0] / n, M.w[1] / n];
+    drawStreet(g, f, M.w, M.w0);
+    const xi = M.fs.map((v, i) => Math.max(0, 1 - st.Y[i] * v));
+    if (st.xi) st.P.forEach((p, i) => {
+      if (xi[i] < 1e-6) return;
+      // from the point to its own margin line ỹf = 1, along ỹ·w
+      const d = xi[i] / n, e = [p[0] + st.Y[i] * u[0] * d, p[1] + st.Y[i] * u[1] * d];
+      el('line', { x1: f.X(p[0]), y1: f.Y(p[1]), x2: f.X(e[0]), y2: f.Y(e[1]), stroke: 'var(--gap)', 'stroke-width': 2.4 }, g);
+      el('circle', { cx: f.X(e[0]), cy: f.Y(e[1]), r: 2.5, fill: 'var(--gap)' }, g);
+    });
+    st.P.forEach((p, i) => {
+      pt(svg, f.X(p[0]), f.Y(p[1]), st.Y[i]);
+      if (M.a[i] > 0) ring(svg, f.X(p[0]), f.Y(p[1]), M.a[i] < C ? 'free' : 'bound');
+      if (st.lab && xi[i] > 1e-6) txt(svg, f.X(p[0]) + 12, f.Y(p[1]) - 10, 'ξ=' + f2(xi[i]), 'ax', { fill: 'var(--gap)' });
+    });
+    const on = M.free.length, bd = M.sv.length - on, mis = M.fs.filter((v, i) => st.Y[i] * v < 0).length, sx = xi.reduce((s, v) => s + v, 0);
+    const me = xi.filter(v => v > 1e-6).length, N = st.P.length;
+    $('#sf-w').textContent = f3(2 / n); $('#sf-nsv').textContent = M.sv.length; $('#sf-on').textContent = on; $('#sf-bd').textContent = bd; $('#sf-mis').textContent = mis; $('#sf-sxi').textContent = f2(sx);
+    $('#sf-chain').innerHTML = `C = ${C < 10 ? f3(C) : C.toFixed(1)}: ‖w‖²/2 + CΣξ = ${f3(n * n / 2)} + ${f3(C)}·${f3(sx)} = <span class="m">${f3(n * n / 2 + C * sx)}</span><br>` +
+      `Σξₙ = <span class="a">${f2(sx)}</span> ≥ #misclassified = <span class="bad">${mis}</span> <span class="mu">(every mistake has ξ &gt; 1)</span><br>` +
+      `ŵ₀ from the ${on} on-margin points (Eq. 17.88) = ${f3(M.w0)}<br>` +
+      `ν-SVM equivalent: margin errors ${me}/${N} = ${f2(me / N)} ≤ ν ≤ support vectors ${M.sv.length}/${N} = ${f2(M.sv.length / N)}`;
+    small($('#sf-pw'), 'w', 'var(--mi)');
+    small($('#sf-pn'), 'n', 'var(--gap)');
+  }
+  slider('sf-c', v => { const c = 10 ** v; return c < 10 ? c.toFixed(2) : c.toFixed(0); }, v => { st.logC = v; render(true); });
+  slider('sf-sep', v => v.toFixed(1), v => { st.sep = v; makeData(); render(); });
+  $('#sf-new').addEventListener('click', () => { st.seed++; makeData(); render(); });
+  $('#sf-xi').addEventListener('change', e => { st.xi = e.target.checked; render(true); });
+  $('#sf-lab').addEventListener('change', e => { st.lab = e.target.checked; render(true); });
+  dragPoints(svg, () => f, st, moving => render(moving));
+  makeData(); render(); renderers.push(() => render(true));
+})();
+
+/* =====================================================================
+   17.3.4  Kernel trick (Eqs. 17.93–17.94)
+   ===================================================================== */
+(function () {
+  const svg = $('#kt-svg');
+  const st = { P: [], Y: [], d: 'circles', k: 'rbf', l: .8, deg: 2, logC: 1, seed: 3, cls: 1 };
+  let f = planeFrame(), M = null;
+  const KF = {
+    lin: dot2,
+    poly: (a, b) => (dot2(a, b) / 4 + 1) ** st.deg,
+    rbf: (a, b) => Math.exp(-((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) / (2 * st.l * st.l))
+  };
+  function makeData() {
+    const r = rng(st.seed * 31 + st.d.length); st.P = []; st.Y = [];
+    const add = (x, y, c) => { st.P.push([clamp(x, -3.9, 3.9), clamp(y, -2.9, 2.9)]); st.Y.push(c); };
+    if (st.d === 'circles') for (let i = 0; i < 44; i++) { const c = i % 2 ? 1 : -1, t = r() * 2 * Math.PI, rad = (c > 0 ? 2.2 : .9) + gauss(r) * .22; add(rad * Math.cos(t), rad * Math.sin(t), c); }
+    else if (st.d === 'moons') for (let i = 0; i < 44; i++) { const c = i % 2 ? 1 : -1, t = r() * Math.PI; const x = c > 0 ? Math.cos(t) : 1 - Math.cos(t), y = c > 0 ? Math.sin(t) : .5 - Math.sin(t); add(1.7 * (x - .5) + gauss(r) * .15, 1.7 * (y - .25) + gauss(r) * .15, c); }
+    else if (st.d === 'xor') for (let i = 0; i < 44; i++) { const sx = r() < .5 ? -1 : 1, sy = r() < .5 ? -1 : 1; add(sx * 1.5 + gauss(r) * .55, sy * 1.3 + gauss(r) * .5, sx * sy); }
+    else for (let i = 0; i < 40; i++) { const c = i % 2 ? 1 : -1; add(c * 1.3 + gauss(r) * .8, c * .6 + gauss(r) * .8, c); }
+  }
+  // marching squares: segments of {f = c} from grid values V[j][i] at (gx[i], gy[j])
+  function contour(V, gx, gy, c) {
+    let d = '';
+    const P = (i, j) => [f.X(gx[i]), f.Y(gy[j])];
+    const it = (p, q, a, b) => { const t = (c - a) / (b - a); return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]; };
+    for (let j = 0; j < gy.length - 1; j++) for (let i = 0; i < gx.length - 1; i++) {
+      const a = V[j][i], b = V[j][i + 1], cc = V[j + 1][i + 1], e = V[j + 1][i];
+      const idx = (a > c) | (b > c) << 1 | (cc > c) << 2 | (e > c) << 3;
+      if (idx === 0 || idx === 15) continue;
+      const pa = P(i, j), pb = P(i + 1, j), pc = P(i + 1, j + 1), pe = P(i, j + 1);
+      const E = [it(pa, pb, a, b), it(pb, pc, b, cc), it(pe, pc, e, cc), it(pa, pe, a, e)]; // bottom, right, top, left
+      const segs = { 1: [[3, 0]], 2: [[0, 1]], 3: [[3, 1]], 4: [[1, 2]], 5: [[3, 2], [0, 1]], 6: [[0, 2]], 7: [[3, 2]], 8: [[2, 3]], 9: [[2, 0]], 10: [[0, 3], [1, 2]], 11: [[2, 1]], 12: [[1, 3]], 13: [[1, 0]], 14: [[0, 3]] }[idx];
+      segs.forEach(([s, t]) => d += `M${E[s][0].toFixed(1)},${E[s][1].toFixed(1)}L${E[t][0].toFixed(1)},${E[t][1].toFixed(1)}`);
+    }
+    return d;
+  }
+  function render(fast) {
+    if (!fast || !M) M = st.P.length > 1 && new Set(st.Y).size > 1 ? svmFit(st.P, st.Y, KF[st.k], 10 ** st.logC, { maxIt: 40000 }) : null;
+    svg.innerHTML = ''; f = planeFrame();
+    if (M) {
+      const gw = 128, gh = 96, gx = grid(PX[0], PX[1], gw), gy = grid(PY[0], PY[1], gh);
+      const V = gy.map(yy => gx.map(xx => M.f([xx, yy])));
+      raster(svg, f, gw, gh, (i, j) => { const c = divColor(Math.tanh(V[j][i] / 1.5) * .75); return [c[0], c[1], c[2], 1]; });
+      planeAxes(svg, f);
+      el('path', { d: contour(V, gx, gy, 1) + contour(V, gx, gy, -1), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.5, 'stroke-dasharray': '6 4' }, svg);
+      el('path', { d: contour(V, gx, gy, 0), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2.6 }, svg);
+    } else planeAxes(svg, f);
+    st.P.forEach((p, i) => {
+      pt(svg, f.X(p[0]), f.Y(p[1]), st.Y[i], 5.5);
+      if (M && M.a[i] > 0) ring(svg, f.X(p[0]), f.Y(p[1]), M.a[i] < M.C ? 'free' : 'bound');
+    });
+    const N = st.P.length;
+    $('#kt-n').textContent = N;
+    $('#kt-nsv').textContent = M ? M.sv.length : '–';
+    $('#kt-acc').textContent = M ? (100 * M.fs.filter((v, i) => st.Y[i] * v > 0).length / N).toFixed(0) + '%' : '–';
+    $('#kt-w0').textContent = M ? f3(M.w0) : '–';
+    const kd = st.k === 'lin' ? 'K(x, x′) = xᵀx′ (a straight boundary)' : st.k === 'poly' ? `K(x, x′) = (xᵀx′/4 + 1)^${st.deg}` : `K(x, x′) = exp(−‖x − x′‖² / 2·${f2(st.l)}²)`;
+    $('#kt-chain').innerHTML = M ? `${kd}<br>support vectors: ${M.sv.length} of ${N} (on margin ${M.free.length}, at α = C ${M.sv.length - M.free.length}). <span class="mu">One prediction costs ${M.sv.length} kernel evaluations.</span>` : 'Need at least one point of each class.';
+  }
+  function hover(p) {
+    if (!M) return;
+    const x = [f.iX(p.x), f.iY(p.y)];
+    if (x[0] < PX[0] || x[0] > PX[1] || x[1] < PY[0] || x[1] > PY[1]) return;
+    const terms = M.sv.map(n => ({ n, v: M.a[n] * M.y[n] * M.k(M.X[n], x) })).sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    const top = terms.slice(0, 3), rest = terms.slice(3).reduce((s, t) => s + t.v, 0), fx = M.f(x);
+    $('#kt-hov').innerHTML = `f(${f2(x[0])}, ${f2(x[1])}) = ${top.map(t => `${f2(M.a[t.n])}·(${M.y[t.n] > 0 ? '+' : '−'}1)·${f2(M.k(M.X[t.n], x))}`).join(' + ')}${terms.length > 3 ? ` + (${terms.length - 3} more: ${f2(rest)})` : ''} + ŵ₀ ${f2(M.w0)} = <b style="color:${fx >= 0 ? 'var(--c0)' : 'var(--c1)'}">${f2(fx)}</b> → ỹ = ${fx >= 0 ? '+1' : '−1'}`;
+  }
+  dragPoints(svg, () => f, st, moving => render(), {
+    empty: (p, fr) => {
+      const x = [fr.iX(p.x), fr.iY(p.y)];
+      if (x[0] < PX[0] || x[0] > PX[1] || x[1] < PY[0] || x[1] > PY[1]) return;
+      st.P.push(x); st.Y.push(st.cls); render();
+    }
+  });
+  svg.addEventListener('pointermove', e => { if (!e.buttons) hover(svgPt(svg, e)); });
+  segm('kt-d', b => { st.d = b.dataset.d; makeData(); render(); });
+  segm('kt-cls', b => { st.cls = +b.dataset.c; });
+  segm('kt-k', b => { st.k = b.dataset.k; render(); });
+  slider('kt-l', v => v.toFixed(2), v => { st.l = v; if (st.k === 'rbf') render(); });
+  slider('kt-deg', v => String(v), v => { st.deg = v; if (st.k === 'poly') render(); });
+  slider('kt-c', v => { const c = 10 ** v; return c < 10 ? c.toFixed(2) : c.toFixed(0); }, v => { st.logC = v; render(); });
+  $('#kt-new').addEventListener('click', () => { st.seed++; makeData(); render(); });
+  $('#kt-clear').addEventListener('click', () => { st.P = []; st.Y = []; render(); });
+  makeData(); render(); renderers.push(() => render(true));
+})();
+
+/* ---------- Lift 1-D points onto a parabola ---------- */
+(function () {
+  const svg = $('#lf-svg');
+  const XS = [-2.4, -1.9, -1.5, 1.4, 1.8, 2.3, -0.9, -0.5, -0.1, 0.3, 0.7, 1.0], YS = XS.map((_, i) => i < 6 ? 1 : -1);
+  const PH = XS.map(x => [x, x * x]);
+  const M = svmFit(PH, YS, KL.lin, 1e6), w = wOf(M);
+  const st = { t: 0, pick: [3, 9] };
+  slider('lf-t', v => Math.round(v * 100) + '%', v => { st.t = v; render(); });
+  let f;
+  function render() {
+    svg.innerHTML = '';
+    f = frame({ W: 640, H: 300, l: 44, r: 12, t: 12, b: 34, x: [-3, 3], y: [-.6, 6.6] });
+    axes(svg, f, { xt: [-3, -2, -1, 0, 1, 2, 3], yt: st.t > .02 ? [0, 2, 4, 6] : [], xl: 'x', yl: st.t > .02 ? 'lift · x²' : '' });
+    const g = clip(svg, f, 'lf-clip');
+    // roots of w₁x + w₂x² + w₀ = 0: the two thresholds back on the line
+    const disc = w[0] * w[0] - 4 * w[1] * M.w0, roots = disc >= 0 ? [(-w[0] - Math.sqrt(disc)) / (2 * w[1]), (-w[0] + Math.sqrt(disc)) / (2 * w[1])].sort((a, b) => a - b) : [];
+    if (st.t > .02) {
+      const xs = grid(-3, 3, 121);
+      el('path', { d: pathOf(xs.map(x => [f.X(x), f.Y(st.t * x * x)])), fill: 'none', stroke: 'var(--muted)', 'stroke-width': 1.2, 'stroke-dasharray': '3 3' }, g);
+      // in lifted coordinates (x, z = t·x²): w₁x + (w₂/t)z + w₀ = 0
+      const wl = [w[0], w[1] / st.t];
+      for (const c of [-1, 1]) drawLine(g, f, wl, M.w0, c, { stroke: 'var(--ink)', 'stroke-width': 1.4, 'stroke-dasharray': '6 4', opacity: st.t }, [-3, 3], [-.6, 6.6]);
+      drawLine(g, f, wl, M.w0, 0, { stroke: 'var(--ink)', 'stroke-width': 2.4, opacity: st.t }, [-3, 3], [-.6, 6.6]);
+    }
+    roots.forEach(r => { el('line', { x1: f.X(r), x2: f.X(r), y1: f.Y(0) - 22, y2: f.Y(0) + 22, stroke: 'var(--mi)', 'stroke-width': 2.2, opacity: st.t > .5 ? 1 : .25 + st.t }, g); });
+    if (st.t > .02) roots.forEach(r => el('line', { x1: f.X(r), x2: f.X(r), y1: f.Y(0), y2: f.Y(st.t * r * r), stroke: 'var(--mi)', 'stroke-dasharray': '2 3', opacity: st.t }, g));
+    XS.forEach((x, i) => {
+      const y = st.t * x * x;
+      if (st.t > .02) el('line', { x1: f.X(x), x2: f.X(x), y1: f.Y(0), y2: f.Y(y), stroke: 'var(--rule)' }, g);
+      const node = pt(svg, f.X(x), f.Y(y), YS[i], 6.5);
+      node.style.cursor = 'pointer';
+      node.addEventListener('click', () => { st.pick = [st.pick[1], i]; render(); });
+      if (st.pick.includes(i)) ring(svg, f.X(x), f.Y(y), 'pick');
+      if (M.a[i] > 0 && st.t > .5) ring(svg, f.X(x), f.Y(y), 'free');
+    });
+    const [a, b] = st.pick.map(i => XS[i]);
+    $('#lf-chain').innerHTML = `ϕ(x) = (x, x²). f(x) = ŵ₁x + ŵ₂x² + ŵ₀ = ${f3(w[0])}·x + ${f3(w[1])}·x² + ${f3(M.w0)}; thresholds at x = ${roots.map(f2).join(' and ')} <span class="mu">(purple)</span><br>` +
+      `picked a = ${f2(a)}, b = ${f2(b)}: ϕ(a)ᵀϕ(b) = ${f2(a)}·${f2(b)} + ${f2(a * a)}·${f2(b * b)} = <span class="m">${f3(a * b + a * a * b * b)}</span> = ab + a²b² = K(a, b), computed without ever building ϕ.<br>` +
+      `<span class="mu">${M.sv.length} support vectors; the lifted problem is linearly separable even though the line isn't.</span>`;
+  }
+  render(); renderers.push(render);
+})();
+
+/* ---------- SVM score vs true log-odds (Fig. 17.15) ---------- */
+(function () {
+  const svg = $('#lo-svg');
+  // class +1 ~ N(0.85, 0.07²), class −1 ~ N(0.7, 0.14²), equal priors
+  const P1 = [.85, .07], P0 = [.7, .14];
+  const lnN = (x, p) => -Math.log(p[1]) - (x - p[0]) ** 2 / (2 * p[1] * p[1]);
+  const r = rng(1715), X = [], Y = [];
+  for (let i = 0; i < 30; i++) { X.push([P1[0] + P1[1] * gauss(r)]); Y.push(1); X.push([P0[0] + P0[1] * gauss(r)]); Y.push(-1); }
+  const st = { l: .08, logC: 0 };
+  slider('lo-l', v => v.toFixed(3), v => { st.l = v; render(); });
+  slider('lo-c', v => { const c = 10 ** v; return c < 10 ? c.toFixed(2) : c.toFixed(0); }, v => { st.logC = v; render(); });
+  function render() {
+    svg.innerHTML = '';
+    const k = (a, b) => Math.exp(-((a[0] - b[0]) ** 2) / (2 * st.l * st.l));
+    const M = svmFit(X, Y, k, 10 ** st.logC);
+    const f = frame({ W: 640, H: 300, l: 44, r: 12, t: 12, b: 36, x: [.35, 1.25], y: [-6, 6] });
+    axes(svg, f, { xt: [.4, .6, .8, 1, 1.2], yt: [-6, -4, -2, 0, 2, 4, 6], xl: 'x' });
+    const g = clip(svg, f, 'lo-clip');
+    el('line', { x1: f.L, x2: f.R, y1: f.Y(0), y2: f.Y(0), stroke: 'var(--muted)' }, g);
+    const xs = grid(.35, 1.25, 361);
+    el('path', { d: pathOf(xs.map(x => [f.X(x), f.Y(clamp(lnN(x, P1) - lnN(x, P0), -7, 7))])), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2, 'stroke-dasharray': '7 5' }, g);
+    el('path', { d: pathOf(xs.map(x => [f.X(x), f.Y(clamp(M.f([x]), -7, 7))])), fill: 'none', stroke: 'var(--mi)', 'stroke-width': 2.6 }, g);
+    X.forEach((x, i) => {
+      const yy = Y[i] > 0 ? f.B - 10 : f.B - 22;
+      pt(svg, f.X(x[0]), yy, Y[i], 4);
+      if (M.a[i] > 0) el('circle', { cx: f.X(x[0]), cy: yy, r: 7.5, fill: 'none', stroke: M.a[i] < M.C ? 'var(--ink)' : 'var(--gap)', 'stroke-width': 1.2 }, svg);
+    });
+    txt(svg, f.L + 8, f.T + 14, 'true log-odds', 'lbl', { fill: 'var(--ink)' });
+    txt(svg, f.L + 8, f.T + 30, `SVM f(x)  (${M.sv.length} SVs)`, 'lbl', { fill: 'var(--mi)' });
+  }
+  render(); renderers.push(render);
+})();
+
+/* =====================================================================
+   Quizzes
+   ===================================================================== */
+const QUIZ = {
+  margin: [
+    { l: 'Kid', q: 'Why build the widest road instead of any road that works?', o: ['A new house a little off would still end up on the right side', 'Wide roads are cheaper', 'So every house touches the road', 'It doesn\'t matter which road'], a: 0, w: 'A big margin leaves room for the data to wobble without changing any prediction.' },
+    { l: 'HS', q: 'Line 3x₁ + 4x₂ − 5 = 0. What is the signed distance of the point (3, 4)?', o: ['4', '20', '5', '3'], a: 0, w: 'f = 9 + 16 − 5 = 20, ‖w‖ = √(9 + 16) = 5, r = 20/5 = 4.' },
+    { l: 'HS', q: 'You double w and w₀. What happens to the boundary and to the margin?', o: ['Neither changes', 'The boundary moves, the margin doubles', 'The margin halves', 'The boundary rotates'], a: 0, w: 'f doubles and ‖w‖ doubles, so r = f/‖w‖ is unchanged. That freedom is what lets the SVM set the closest ỹf to 1.' },
+    { l: 'Undergrad', q: 'After fixing the scale so the closest point has ỹf = 1, the margin equals…', o: ['1/‖w‖', '‖w‖', '2‖w‖', '½‖w‖²'], a: 0, w: 'Margin = min ỹf / ‖w‖ = 1/‖w‖. The street from f = −1 to f = +1 is 2/‖w‖ wide.' },
+    { l: 'Undergrad', q: 'Why minimize ½‖w‖² instead of maximizing 1/‖w‖?', o: ['Same optimum, but a smooth convex quadratic is easier to solve', 'They have different optima', 'To add regularization', 'Because ‖w‖ can be negative'], a: 0, w: '1/‖w‖ is maximized exactly where ‖w‖ (and ‖w‖²) is minimized. The quadratic gives a standard QP.' },
+    { l: 'Undergrad', q: 'Feature x₁ is in dollars (0–80,000) and x₀ in years (0–6). Without scaling, the max-margin boundary will mostly…', o: ['depend on x₁, since it dominates Euclidean distance', 'depend on x₀', 'be unaffected', 'fail to exist'], a: 0, w: 'Distance treats one unit in every direction the same, so the large-valued feature dominates (Fig. 17.14).' },
+    { l: 'Grad', q: 'The hard-margin hyperplane for separable data is the perpendicular bisector of…', o: ['the shortest segment between the two classes\' convex hulls', 'the segment between the class means', 'the first principal component', 'the two farthest points'], a: 0, w: 'The dual is equivalent to finding the nearest pair of points in the two convex hulls (the reduced hulls in the soft case).' }
+  ],
+  dual: [
+    { l: 'Kid', q: 'Which houses push on the road?', o: ['Only the ones touching the edge', 'All of them equally', 'Only the farthest ones', 'Only the red ones'], a: 0, w: 'Houses away from the road push with zero force: α = 0.' },
+    { l: 'HS', q: 'ŵ = Σ αₙỹₙxₙ. A point has αₙ = 0. If you delete it, what happens to the boundary?', o: ['Nothing', 'It moves toward that point', 'It rotates 90°', 'It disappears'], a: 0, w: 'It contributes nothing to ŵ, and its constraint wasn\'t active, so the solution stays put.' },
+    { l: 'Undergrad', q: 'Setting ∂L/∂w₀ = 0 gives which constraint on the dual?', o: ['Σ αₙỹₙ = 0', 'Σ αₙ = 1', 'αₙ ≤ C', 'αₙ ≥ 0'], a: 0, w: 'L contains −w₀ Σ αₙỹₙ. Its derivative w.r.t. w₀ must vanish (17.72, 17.74).' },
+    { l: 'Undergrad', q: 'KKT: αₙ(ỹₙf(xₙ) − 1) = 0. A point has ỹf = 1.7. Its α is…', o: ['0', '1', '1.7', 'C'], a: 0, w: 'The second factor is 0.7 ≠ 0, so αₙ must be 0.' },
+    { l: 'Undergrad', q: 'In the dual, how do the training inputs appear?', o: ['Only through inner products xᵢᵀxⱼ', 'Only through their norms', 'Through w directly', 'Through the labels only'], a: 0, w: 'That is what makes the kernel trick possible (17.77).' },
+    { l: 'Undergrad', q: 'At the optimum, Σ αₙ equals…', o: ['‖ŵ‖²', '1', 'N', '0'], a: 0, w: 'Strong duality: ½‖ŵ‖² = Σα − ½‖ŵ‖², so Σα = ‖ŵ‖². Check the Play box when it converges.' },
+    { l: 'Grad', q: 'Why does SMO update two multipliers at a time instead of one?', o: ['Σ αₙỹₙ = 0 means changing one alone would violate the equality', 'Two is faster than one', 'The objective is not convex in one variable', 'To keep α ≤ C'], a: 0, w: 'With one α changing, Σαỹ would change. The smallest feasible move changes a pair along αᵢỹᵢ + αⱼỹⱼ = const.' }
+  ],
+  soft: [
+    { l: 'Kid', q: 'You make the fine C very small. What kind of road do you get?', o: ['Wide, with several houses in the way', 'Very skinny', 'No road at all', 'A curvy road'], a: 0, w: 'Breaking the rules is cheap, so the road gets wide.' },
+    { l: 'HS', q: 'A point has slack ξ = 1.4. Where is it?', o: ['On the wrong side of the boundary', 'Outside the street, correct side', 'Exactly on the margin', 'Inside the street, correct side'], a: 0, w: 'ξ > 1 means ỹf < 0: misclassified.' },
+    { l: 'Undergrad', q: 'Where does the box constraint αₙ ≤ C come from?', o: ['∂L/∂ξₙ = C − αₙ − μₙ = 0 with μₙ ≥ 0', 'The constraint Σαỹ = 0', 'Normalizing w', 'It is assumed, not derived'], a: 0, w: 'αₙ = C − μₙ and μₙ ≥ 0 give αₙ ≤ C.' },
+    { l: 'Undergrad', q: 'A point has 0 < αₙ < C. Then…', o: ['ξₙ = 0 and ỹₙfₙ = 1', 'ξₙ > 1', 'it is ignored', 'ỹₙfₙ > 1'], a: 0, w: 'αₙ < C ⇒ μₙ > 0 ⇒ ξₙ = 0, and αₙ > 0 ⇒ the margin constraint is active.' },
+    { l: 'Undergrad', q: 'Why compute ŵ₀ only over points with 0 < α < C (Eq. 17.88)?', o: ['Only they are known to satisfy ỹf = 1 exactly', 'They are the majority', 'Points with α = C have no label', 'To make the sum smaller'], a: 0, w: 'Points with α = C have unknown slack ξ, so ỹf = 1 − ξ isn\'t usable for solving for w₀.' },
+    { l: 'Undergrad', q: 'With 3 misclassified training points, Σ ξₙ is at least…', o: ['3', '0', '1', 'C'], a: 0, w: 'Each misclassified point has ξ > 1.' },
+    { l: 'Grad', q: 'ν-SVM with ν = 0.2 on N = 100 points. Which is guaranteed?', o: ['At most 20 margin errors and at least 20 support vectors', 'Exactly 20 support vectors', 'At most 20 support vectors', 'Training error is exactly 20%'], a: 0, w: 'ν upper-bounds the fraction of margin errors and lower-bounds the fraction of SVs.' }
+  ],
+  kernel: [
+    { l: 'Kid', q: 'Red marbles in a ring around blue ones. How can a flat sheet separate them?', o: ['Lift the marbles by distance from the center first', 'Use a bigger sheet', 'Remove the blue ones', 'It can\'t'], a: 0, w: 'After lifting, the outside ones are high and the inside ones are low, and a flat sheet fits between them.' },
+    { l: 'HS', q: 'With ϕ(x) = (x, x²), what is ϕ(2)ᵀϕ(−1)?', o: ['2', '−2', '6', '−6'], a: 0, w: '(2)(−1) + (4)(1) = −2 + 4 = 2.' },
+    { l: 'Undergrad', q: 'A kernel SVM has 12 support vectors among 500 training points. One prediction needs how many kernel evaluations?', o: ['12', '500', '1', '6000'], a: 0, w: 'f(x) = Σ over S of αₙỹₙK(xₙ, x) + ŵ₀: one per support vector (17.93).' },
+    { l: 'Undergrad', q: 'Why must K be a Mercer (PSD) kernel for the SVM dual?', o: ['So Qᵢⱼ = ỹᵢỹⱼKᵢⱼ is PSD and the dual stays concave', 'So the SVs are sparse', 'So w₀ is zero', 'So the data are separable'], a: 0, w: 'A PSD Gram matrix keeps the QP convex, with a global optimum that SMO finds.' },
+    { l: 'Undergrad', q: 'RBF kernel, you shrink the length scale ℓ a lot. Typically…', o: ['Nearly every point becomes a support vector and the boundary hugs points', 'The boundary becomes a straight line', 'There are fewer support vectors', 'Nothing changes'], a: 0, w: 'Each kernel bump is narrow, so every point needs its own bump. Try it in the Play box.' },
+    { l: 'Undergrad', q: 'Far from every support vector, an RBF SVM\'s f(x) approaches…', o: ['ŵ₀', '0', '+1', '−1'], a: 0, w: 'All K(xₙ, x) → 0, leaving only the bias.' },
+    { l: 'Grad', q: 'Is the SVM score f(x) a calibrated log-odds?', o: ['No: use Platt scaling or a probabilistic model', 'Yes, by construction', 'Only with the RBF kernel', 'Only when C = 1'], a: 0, w: 'The hinge loss doesn\'t estimate probabilities (Fig. 17.15). Platt fits σ(af + b) on held-out data.' }
+  ]
+};
+/* ---------- levels ---------- */
+const LEVELS = { 1: 'Kid', 2: 'High school', 3: 'Undergrad', 4: 'Grad / MLE' };
+let level = 3;
+try { const s = localStorage.getItem('svm-lab-level'); if (s && LEVELS[s]) level = +s; } catch (e) {}
+$$('[data-lv]').forEach(card => {
+  const kids = [...card.children];
+  const tabs = document.createElement('div'); tabs.className = 'lvtabs'; tabs.setAttribute('role', 'tablist');
+  tabs.innerHTML = Object.entries(LEVELS).map(([k, v]) => `<button role="tab" data-tab="${k}">${v}</button>`).join('');
+  const body = document.createElement('div'); body.className = 'lvbody';
+  kids.forEach(k => body.appendChild(k));
+  card.appendChild(tabs); card.appendChild(body);
+  tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) showCard(card, +b.dataset.tab); });
+});
+function showCard(card, l) {
+  $$('.lvbody > [data-l]', card).forEach(d => { d.hidden = +d.dataset.l !== l; });
+  $$('[data-tab]', card).forEach(b => { b.classList.toggle('on', +b.dataset.tab === l); b.setAttribute('aria-selected', +b.dataset.tab === l); });
+}
+function setLevel(l) {
+  level = l; try { localStorage.setItem('svm-lab-level', l); } catch (e) {}
+  $$('[data-lv]').forEach(c => showCard(c, l));
+  $$('[data-setl]').forEach(b => b.classList.toggle('on', +b.dataset.setl === l));
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-setl]'); if (b) setLevel(+b.dataset.setl); });
+setLevel(level);
+
+/* ---------- score ---------- */
+const SCORE = { right: 0, total: 0, paint() { $('#score').innerHTML = `Quiz <b>${this.right}</b> / ${this.total}`; } };
+
+(function () {
+  $$('[data-quiz]').forEach(box => {
+    const qs = QUIZ[box.dataset.quiz]; SCORE.total += qs.length;
+    let local = 0;
+    // fixed per-question shuffle so the right answer isn't always in the same slot
+    const order = q => { let h = 0; for (const ch of q.q) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); const r = rng(h), ix = q.o.map((_, j) => j); for (let j = ix.length - 1; j > 0; j--) { const k = Math.floor(r() * (j + 1)); [ix[j], ix[k]] = [ix[k], ix[j]]; } return ix; };
+    function build() {
+      box.innerHTML = qs.map((q, i) => `<div class="qq" data-i="${i}"><p class="qt"><span class="qn">Q${i + 1}</span>${q.q}<span class="ql">${q.l}</span></p><div class="opts">${order(q).map(j => `<button class="opt" data-j="${j}">${q.o[j]}</button>`).join('')}</div></div>`).join('') +
+        `<div class="quizfoot"><span class="qs">0 / ${qs.length} correct</span><button class="b qreset">Reset these questions</button></div>`;
+    }
+    build();
+    box.addEventListener('click', e => {
+      if (e.target.closest('.qreset')) { SCORE.right -= local; local = 0; build(); SCORE.paint(); return; }
+      const b = e.target.closest('.opt'); if (!b || b.disabled) return;
+      const card = b.closest('.qq'), q = qs[+card.dataset.i], ok = +b.dataset.j === q.a;
+      $$('.opt', card).forEach(x => { x.disabled = true; if (+x.dataset.j === q.a) x.classList.add('right'); });
+      if (!ok) b.classList.add('wrong');
+      card.insertAdjacentHTML('beforeend', `<p class="why-ans"><b class="${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite.'}</b> ${q.w}</p>`);
+      if (ok) { local++; SCORE.right++; }
+      $('.qs', box).textContent = `${local} / ${qs.length} correct`;
+      SCORE.paint();
+    });
+  });
+  SCORE.paint();
+})();
+
+/* ---------- Rail highlight + theme changes ---------- */
+(function () {
+  const links = $$('#rail a'), secs = links.map(a => $(a.getAttribute('href')));
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) links.forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#' + e.target.id)); });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  secs.forEach(s => s && io.observe(s));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderers.forEach(f => f()));
+})();
+})();
+</script>
